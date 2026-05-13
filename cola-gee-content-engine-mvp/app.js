@@ -305,10 +305,48 @@ function calendarTable() {
       <td>${selectInline(state.settings.statuses, row.status, `editCalendar(${index}, 'status', this.value)`)}</td>
     </tr>
   `).join("");
-  return `<div class="table-wrap"><table>
+  return `<div class="calendar-table-view table-wrap"><table>
     <thead><tr><th>日期</th><th>形式</th><th>目標</th><th>受眾</th><th>主題</th><th>標題</th><th>Hook</th><th>核心角度</th><th>CTA</th><th>平台</th><th>廣告</th><th>狀態</th></tr></thead>
     <tbody>${rows}</tbody>
-  </table></div>`;
+  </table></div>${calendarCards()}`;
+}
+
+function calendarCards() {
+  const cards = state.content_calendar.map((row, index) => `
+    <article class="calendar-card">
+      <div class="calendar-card-head">
+        <div>
+          <span class="calendar-date">${row.date}</span>
+          <h4>${escapeHtml(row.title || "未命名內容")}</h4>
+        </div>
+        <span class="tag status">${row.status || "靈感"}</span>
+      </div>
+      <div class="calendar-card-tags">
+        <span class="tag">${row.content_format}</span>
+        <span class="tag">${row.content_goal}</span>
+        <span class="tag">${row.topic}</span>
+      </div>
+      <div class="mobile-form-grid">
+        ${mobileField("日期", `<input value="${row.date}" onchange="editCalendar(${index}, 'date', this.value)">`)}
+        ${mobileField("形式", selectInline(defaults.formats, row.content_format, `editCalendar(${index}, 'content_format', this.value)`))}
+        ${mobileField("目標", selectInline(defaults.goals, row.content_goal, `editCalendar(${index}, 'content_goal', this.value)`))}
+        ${mobileField("廣告", selectInline(["否", "是"], row.ad_suitable ? "是" : "否", `editCalendar(${index}, 'ad_suitable', this.value === '是')`))}
+      </div>
+      ${mobileField("目標受眾", `<input value="${escapeHtml(row.audience || "")}" onchange="editCalendar(${index}, 'audience', this.value)">`)}
+      ${mobileField("主題分類", `<input value="${escapeHtml(row.topic || "")}" onchange="editCalendar(${index}, 'topic', this.value)">`)}
+      ${mobileField("內容標題", `<input value="${escapeHtml(row.title || "")}" onchange="editCalendar(${index}, 'title', this.value)">`)}
+      ${mobileField("開頭 Hook", `<textarea onchange="editCalendar(${index}, 'hook', this.value)">${escapeHtml(row.hook || "")}</textarea>`)}
+      ${mobileField("核心角度", `<textarea onchange="editCalendar(${index}, 'angle', this.value)">${escapeHtml(row.angle || "")}</textarea>`)}
+      ${mobileField("CTA", `<input value="${escapeHtml(row.cta || "")}" onchange="editCalendar(${index}, 'cta', this.value)">`)}
+      ${mobileField("建議發布平台", `<input value="${escapeHtml(row.platform || "")}" onchange="editCalendar(${index}, 'platform', this.value)">`)}
+      ${mobileField("狀態", selectInline(state.settings.statuses, row.status, `editCalendar(${index}, 'status', this.value)`))}
+    </article>
+  `).join("");
+  return `<div class="calendar-card-list">${cards}</div>`;
+}
+
+function mobileField(label, control) {
+  return `<label class="mobile-field"><span>${label}</span>${control}</label>`;
 }
 
 function generateCalendar() {
