@@ -267,6 +267,36 @@ table {
   background: white;
 }
 
+.calendar-table-view table {
+  table-layout: fixed;
+  min-width: 1880px;
+}
+
+.calendar-table-view th:nth-child(1),
+.calendar-table-view td:nth-child(1) { width: 140px; }
+.calendar-table-view th:nth-child(2),
+.calendar-table-view td:nth-child(2) { width: 140px; }
+.calendar-table-view th:nth-child(3),
+.calendar-table-view td:nth-child(3) { width: 140px; }
+.calendar-table-view th:nth-child(4),
+.calendar-table-view td:nth-child(4) { width: 170px; }
+.calendar-table-view th:nth-child(5),
+.calendar-table-view td:nth-child(5) { width: 170px; }
+.calendar-table-view th:nth-child(6),
+.calendar-table-view td:nth-child(6) { width: 230px; }
+.calendar-table-view th:nth-child(7),
+.calendar-table-view td:nth-child(7) { width: 260px; }
+.calendar-table-view th:nth-child(8),
+.calendar-table-view td:nth-child(8) { width: 300px; }
+.calendar-table-view th:nth-child(9),
+.calendar-table-view td:nth-child(9) { width: 170px; }
+.calendar-table-view th:nth-child(10),
+.calendar-table-view td:nth-child(10) { width: 230px; }
+.calendar-table-view th:nth-child(11),
+.calendar-table-view td:nth-child(11) { width: 110px; }
+.calendar-table-view th:nth-child(12),
+.calendar-table-view td:nth-child(12) { width: 130px; }
+
 th,
 td {
   text-align: left;
@@ -274,6 +304,27 @@ td {
   padding: 10px;
   vertical-align: top;
   font-size: 14px;
+}
+
+.calendar-table-view td {
+  padding: 12px;
+}
+
+.calendar-table-view input,
+.calendar-table-view select,
+.calendar-table-view textarea {
+  min-width: 0;
+  overflow: visible;
+}
+
+.calendar-table-view input,
+.calendar-table-view select {
+  height: 44px;
+}
+
+.calendar-table-view textarea {
+  min-height: 132px;
+  line-height: 1.5;
 }
 
 th {
