@@ -4,6 +4,7 @@
   "private": true,
   "description": "可樂吉健康研究所減重教練自然流量內容引擎 MVP",
   "scripts": {
+    "build": "node -e \"require('fs').mkdirSync('dist',{recursive:true}); for (const f of ['index.html','app.js','styles.css']) require('fs').copyFileSync(f, 'dist/'+f);\"",
     "start": "node server.js"
   }
 }
