@@ -407,14 +407,13 @@ function generateScript() {
 }
 
 function makeScript(topic, audience, goal, length, style, cta, contentId) {
-  const hooks = [
-    hookFor(topic, audience, goal),
-    `如果你是${audience}，減不下來可能不是因為你不夠努力`,
-    `${topic}最容易卡住的地方，通常不是你以為的那一個`
-  ];
-  const spoken = spokenScript(topic, audience, style, cta);
-  const subtitles = spoken.split("。").map((s) => s.trim()).filter(Boolean).map((s) => trimText(s, 18));
-  const storyboard = storyboardFor(topic, audience, spoken, cta);
+  const profile = scriptTopicProfile(topic, audience);
+  const seconds = parseDuration(length);
+  const hooks = hookOptionsFor(topic, audience, goal, style, profile);
+  const segments = scriptSegments(topic, audience, goal, seconds, style, cta, profile, hooks[0]);
+  const spoken = segments.map((segment) => segment.text).join("\n\n");
+  const subtitles = subtitleLinesFromSegments(segments);
+  const storyboard = storyboardFor(topic, audience, segments, cta, style, profile);
   return {
     id: uid("script"),
     content_id: contentId,
@@ -424,6 +423,7 @@ function makeScript(topic, audience, goal, length, style, cta, contentId) {
     length,
     style,
     cta,
+    segments,
     hook_options: hooks,
     selected_hook: hooks[0],
     spoken_script: spoken,
@@ -443,7 +443,7 @@ function makeScript(topic, audience, goal, length, style, cta, contentId) {
       `直接版：想找出減不下來的根源，留言「測驗」，我傳減脂能量測驗給你。`,
       `互動版：你比較像外食型、壓力型，還是停滯型？留言「測驗」我幫你從測驗開始看。`
     ],
-    quality: qualityCheck(hooks[0], cta, audience, spoken),
+    quality: qualityCheck(hooks[0], cta, audience, spoken, seconds, segments),
     created_at: iso(),
     updated_at: iso()
   };
@@ -850,12 +850,7 @@ CTA：${s.cta}
 ${s.hook_options.map((h, i) => `${i + 1}. ${h}`).join("\n")}
 
 ## B. 完整短影音腳本
-開頭 0 到 3 秒：${s.hook_options[0]}
-痛點 3 到 10 秒：你可能白天都很努力控制，但一到晚上或壓力大，就開始想補償自己。
-核心觀念 10 到 25 秒：減脂卡住常常不是單一食物造成，而是生活節奏、壓力、外食選擇和飽足感沒有配合。
-舉例 25 到 40 秒：像常外食的人，如果午餐蛋白質太少，下午靠咖啡撐，晚上就更容易嘴饞。
-行動建議 40 到 55 秒：先不要急著更少吃，先記錄三天：外食、壓力、睡眠、嘴饞時間。
-CTA 55 到 60 秒：${s.cta}，我提供減脂能量測驗，幫你找出最深的原因。
+${(s.segments || legacySegments(s)).map((segment) => `${segment.label} ${segment.time}：${segment.text}`).join("\n")}
 
 ## C. 字幕版腳本
 ${s.subtitle_script.map((line) => `- ${line}`).join("\n")}
@@ -938,36 +933,313 @@ ${c.story_dm.map((x) => `- ${x}`).join("\n")}
 ${c.dm_script}`;
 }
 
-function spokenScript(topic, audience, style, cta) {
-  const base = {
-    "打臉迷思型": `很多${audience}以為，${topic}卡住就是自己不夠自律。但其實，問題常常不是你吃了一餐不完美，而是整天的節奏讓你很難穩定。你可能早餐太隨便、午餐蛋白質不夠、下午靠咖啡撐，到了晚上就很想補償。減脂不是把自己逼到更緊，而是找出最容易破功的時間點，先做一個小調整。${cta}，我把減脂能量測驗傳給你，先看看你卡在哪一型。`,
-    "自我檢查型": `如果你有三個狀況：白天能忍，晚上容易失控；外食一多就不知道怎麼選；體重卡住後只想再少吃。那${topic}可能不是單一飲食問題，而是節奏、壓力和飽足感一起卡住。第一步先記錄三天，不用改，先看自己最常在哪個時間破功。${cta}，我提供測驗幫你找出比較深的原因。`,
-    "情境共鳴型": `你是不是也有這種一天？早上趕出門，中午隨便吃，下午累到想喝甜的，晚上回家終於放鬆，結果一打開外送就停不下來。這不一定是你意志力差，而是你的生活壓力一直在累積，身體和情緒都想找補償。先不用急著更少吃，先找出哪個環節最容易讓你破功。${cta}，我把減脂能量測驗傳給你。`,
-    "客戶案例型": `之前有一位客人也覺得自己${topic}很嚴重，他原本以為問題是晚餐吃太多。解析後才發現，他真正卡住的是白天蛋白質太少，加上工作壓力大，晚上才一直想吃。後來我們先調整午餐和下午點心，不是叫他硬忍。你也可以先找出自己的卡點。${cta}，我傳測驗給你。`,
-    "故事型": `有時候減重最累的地方，不是知道方法，而是每天都要在忙碌裡做選擇。對${audience}來說，${topic}常常藏在生活細節裡。你以為是某一餐吃錯，其實可能是整天累積下來的飢餓、壓力和沒被安排好的選擇。先從一個最常失控的時段調整就好。${cta}，我們先用測驗找到起點。`,
-    "二選一互動型": `你比較像第一種，白天很能忍，晚上容易破功；還是第二種，平日很規律，週末就失控？兩種都不是單純不自律，而是${topic}背後的卡點不同。第一種常跟壓力和飽足感有關，第二種常跟限制太久有關。留言 1 或 2，也可以${cta}，我幫你從測驗開始看。`
-  };
-  return base[style] || base["情境共鳴型"];
+function parseDuration(length) {
+  const matched = String(length).match(/\d+/);
+  return matched ? Number(matched[0]) : 60;
 }
 
-function storyboardFor(topic, audience, spoken, cta) {
-  const beats = [
-    ["0-3秒", "上班族晚上打開冰箱，表情疲憊", "你是不是白天都忍住，晚上卻爆吃？", "白天忍住，晚上爆吃？", "冰箱、宵夜、疲憊表情"],
-    ["3-10秒", "坐在桌前看外送 APP", "這不一定是你不自律。", "不是不自律", "外送 APP、壓力、疲憊"],
-    ["10-25秒", "教練對鏡頭口播，旁邊有簡單流程圖", "可能是生活壓力、飽足感和外食節奏一起卡住。", "先找真正卡點", "便條紙、餐盤、工作桌"],
-    ["25-40秒", "午餐便當與下午咖啡對比", "像午餐蛋白質太少，晚上就更容易嘴饞。", "午餐沒吃穩", "便當、咖啡、點心"],
-    ["40-55秒", "手機備忘錄記錄三天飲食與壓力", "先記錄三天，看你最常在哪裡破功。", "先記錄三天", "手機筆記、日曆"],
-    ["55-60秒", "教練微笑收尾，畫面乾淨留白", `${cta}，我把測驗方式傳給你。`, "留言「測驗」", "乾淨背景、CTA 字卡"]
+function scriptTopicProfile(topic, audience) {
+  const profile = {
+    pain: "努力控制飲食，卻還是很難穩定下降",
+    scene: "忙碌上班族在下班後看著手機外送畫面",
+    misconception: "只要再少吃、再忍耐就會變好",
+    root: "飲食安排、壓力、睡眠和飽足感沒有配合生活節奏",
+    example: "中午只吃澱粉和青菜，下午靠咖啡撐，晚上回家就很想吃高熱量食物",
+    action: "先記錄三天的用餐時間、蛋白質、壓力和嘴饞時間",
+    broll: "外送 APP、辦公桌、便當、手機備忘錄",
+    firstStep: "先找出最常破功的那一餐或那個時段"
+  };
+  if (topic.includes("壓力") || topic.includes("情緒")) {
+    return {
+      ...profile,
+      pain: "白天忍得住，晚上或壓力大時就想用吃來放鬆",
+      scene: "上班族晚上回家坐在餐桌前，一邊滑手機一邊想點外送",
+      misconception: "壓力大亂吃就是意志力太差",
+      root: "壓力累積、白天吃得不穩和情緒補償同時出現",
+      example: "早餐趕時間、午餐隨便吃，下午累到想喝甜的，晚上就很難停在剛好的份量",
+      action: "先把下午到晚上的壓力和飢餓程度記下來，不要一開始就硬戒",
+      broll: "加班畫面、外送 APP、冰箱、疲憊表情、手機備忘錄",
+      firstStep: "先處理最容易爆食前的那個壓力時段"
+    };
+  }
+  if (topic.includes("外食")) {
+    return {
+      ...profile,
+      pain: "每天外食，不知道怎麼選才不會越吃越卡",
+      scene: "上班族站在便當店或超商前，猶豫要選哪一餐",
+      misconception: "外食族減脂只能吃水煮餐或完全不碰澱粉",
+      root: "餐點選擇不是只有熱量，還要看蛋白質、蔬菜、醬料和晚餐飢餓感",
+      example: "午餐吃乾麵加手搖，晚上再吃便當，很容易蛋白質不足但總熱量偏高",
+      action: "先用一個順序選餐：蛋白質先到位，再補蔬菜，最後調整澱粉和醬料",
+      broll: "便當店、超商餐盒、蛋白質食物、醬料分開、餐盤特寫",
+      firstStep: "先把每餐的蛋白質補到比較穩"
+    };
+  }
+  if (topic.includes("停滯")) {
+    return {
+      ...profile,
+      pain: "明明有控制，體重卻卡住好幾週",
+      scene: "上班族早上站上體重計，看著數字沒有變化",
+      misconception: "停滯期一定要吃更少或運動更多",
+      root: "身體壓力、睡眠、活動量下降和飲食紀錄落差都可能讓進度變慢",
+      example: "平日吃很少，週末補回來；或工作忙到步數下降，自己卻沒有發現",
+      action: "先檢查七天平均，不只看單日體重，也看步數、睡眠和週末飲食",
+      broll: "體重計、行事曆、步數畫面、餐點紀錄、睡眠紀錄",
+      firstStep: "先看七天趨勢，不要只看今天的體重"
+    };
+  }
+  if (topic.includes("復胖")) {
+    return {
+      ...profile,
+      pain: "瘦下來後沒多久又回到原本的生活",
+      scene: "衣櫃前試穿以前的褲子，表情有點挫折",
+      misconception: "復胖代表之前努力都失敗了",
+      root: "方法太靠短期限制，沒有變成可以長期維持的生活策略",
+      example: "體驗期很認真，但一回到聚餐、外食、加班，就沒有可執行的替代方案",
+      action: "先找出復胖前最先鬆掉的是早餐、外食、睡眠還是壓力",
+      broll: "衣櫃、聚餐、加班、行事曆、餐點選擇",
+      firstStep: "把最容易鬆掉的生活環節先補起來"
+    };
+  }
+  return profile;
+}
+
+function hookOptionsFor(topic, audience, goal, style, profile) {
+  const styleHooks = {
+    "打臉迷思型": [
+      `${topic}卡住，不一定是你不夠努力`,
+      `先別再怪意志力，${topic}可能卡在這裡`,
+      `${profile.misconception}，這句話可能讓你更卡`
+    ],
+    "自我檢查型": [
+      `有這 3 個狀況，難怪${topic}很卡`,
+      `${audience}先檢查這 3 件事`,
+      `你不是沒努力，可能是卡點看錯了`
+    ],
+    "情境共鳴型": [
+      `你是不是也有這種減重的一天？`,
+      `白天很努力，晚上卻又破功？`,
+      `${audience}最常不是輸在方法，是輸在生活節奏`
+    ],
+    "客戶案例型": [
+      `有位客人一直以為自己吃太多`,
+      `他卡住 2 個月，問題不是晚餐`,
+      `一個${audience}的減脂卡點案例`
+    ],
+    "故事型": [
+      `減重最累的，常常不是食物本身`,
+      `你以為是一餐吃錯，其實是一整天累積`,
+      `這是很多${audience}的真實日常`
+    ],
+    "二選一互動型": [
+      `你是白天忍住型，還是晚上破功型？`,
+      `你比較像外食卡住，還是壓力卡住？`,
+      `留言 1 或 2，我猜你卡在哪`
+    ],
+    "專業口播": [
+      `${topic}先看一個關鍵觀念`,
+      `${audience}減脂要先懂這件事`,
+      `不是少吃就好，重點是策略能不能穩定`
+    ]
+  };
+  const hooks = styleHooks[style] || styleHooks["專業口播"];
+  if (goal === "轉換型") hooks[2] = `想找出${topic}真正卡點，先做這個檢查`;
+  return hooks.map((h) => trimText(h, 30));
+}
+
+function scriptSegments(topic, audience, goal, seconds, style, cta, profile, selectedHook) {
+  const timings = segmentTimings(seconds);
+  const builders = templateBuilders(topic, audience, profile, cta);
+  const key = builders[style] ? style : "專業口播";
+  return timings.map((timing, index) => {
+    const part = builders[key][index] || builders["專業口播"][index];
+    return {
+      ...timing,
+      text: adaptSegmentText(part(timing, selectedHook, goal), timing.label, seconds, profile, topic, audience)
+    };
+  });
+}
+
+function adaptSegmentText(text, label, seconds, profile, topic, audience) {
+  if (seconds === 30) {
+    const concise = {
+      "痛點": `${profile.pain}，通常不是你不努力，而是前面幾個環節已經累積到很難控制。`,
+      "核心觀念": `${topic}要看的不是單一食物，而是${profile.root}。`,
+      "生活例子": `像${profile.example}，最後破功只是結果。`,
+      "行動建議": `先做一件事：${profile.firstStep}。`,
+      "CTA": text
+    };
+    return concise[label] || text;
+  }
+  if (seconds === 45) {
+    if (label === "生活例子") return `${text} 你不用一次改全部，先抓最常重複的那個模式就好。`;
+    if (label === "行動建議") return `${text} 重點不是記得很完美，而是看出哪個時間點最容易失控。`;
+    return text;
+  }
+  if (seconds === 90) {
+    const expanded = {
+      "痛點": `${text} 這種狀況很常見，尤其是${audience}，不是沒有想改，而是每天的選擇太多、恢復時間太少。`,
+      "核心觀念": `${text} 所以真正有效的做法，通常不是再加一條更嚴格的規則，而是先找出哪個環節最容易讓你失去穩定度。`,
+      "生活例子": `${text} 如果你只檢討最後那一餐，可能會覺得自己很糟；但如果往前看，會發現身體其實已經餓、累、緊繃一整天。`,
+      "行動建議": `${text} 你也可以順手標記 1 到 5 分：當天壓力幾分、飢餓幾分、睡眠幾分。三天後通常會看出一個很明顯的規律。`,
+      "CTA": `${text} 如果你有疾病、懷孕、用藥或飲食疾患狀況，請先和專業醫療人員確認適合的方式。`
+    };
+    return expanded[label] || text;
+  }
+  return text;
+}
+
+function segmentTimings(seconds) {
+  const maps = {
+    30: [
+      ["開頭", "0-3秒"],
+      ["痛點", "3-8秒"],
+      ["核心觀念", "8-17秒"],
+      ["生活例子", "17-24秒"],
+      ["行動建議", "24-28秒"],
+      ["CTA", "28-30秒"]
+    ],
+    45: [
+      ["開頭", "0-3秒"],
+      ["痛點", "3-10秒"],
+      ["核心觀念", "10-23秒"],
+      ["生活例子", "23-34秒"],
+      ["行動建議", "34-41秒"],
+      ["CTA", "41-45秒"]
+    ],
+    60: [
+      ["開頭", "0-3秒"],
+      ["痛點", "3-10秒"],
+      ["核心觀念", "10-25秒"],
+      ["生活例子", "25-40秒"],
+      ["行動建議", "40-55秒"],
+      ["CTA", "55-60秒"]
+    ],
+    90: [
+      ["開頭", "0-3秒"],
+      ["痛點", "3-14秒"],
+      ["核心觀念", "14-34秒"],
+      ["生活例子", "34-56秒"],
+      ["行動建議", "56-78秒"],
+      ["CTA", "78-90秒"]
+    ]
+  };
+  return (maps[seconds] || maps[60]).map(([label, time]) => ({ label, time }));
+}
+
+function templateBuilders(topic, audience, profile, cta) {
+  const ctaLine = `${cta}，我會把減脂能量測驗傳給你，先找出你現在比較像哪一種卡點。`;
+  return {
+    "打臉迷思型": [
+      () => `${profile.misconception}，這可能是${audience}最容易被卡住的一句話。`,
+      () => `很多人遇到${profile.pain}，第一個反應就是更少吃、再忍一下，但這樣常常只會讓下一次破功更大。`,
+      () => `真正要看的不是某一餐完不完美，而是你的方法能不能放進生活。${profile.root}，才是${topic}常見的核心。`,
+      () => `例如：${profile.example}。表面看起來是晚上吃太多，其實前面幾個小環節已經把你推到很難控制。`,
+      () => `你可以先做一件事：${profile.action}。先看見模式，再調整策略，不需要一開始就把自己逼到很緊。`,
+      () => ctaLine
+    ],
+    "自我檢查型": [
+      () => `如果你有這 3 個狀況，${topic}卡住可能不是單一飲食問題。`,
+      () => `第一，${profile.pain}；第二，明明知道該控制，忙起來還是很難執行；第三，一卡住就想把方法變得更極端。`,
+      () => `這通常代表你需要看的不是意志力，而是${profile.root}。卡點不同，調整順序也會不同。`,
+      () => `像${audience}常見狀況是：${profile.example}。如果只看最後一餐，就會誤判真正原因。`,
+      () => `第一步先做自我檢查：最近三天最常破功的時間、當時壓力、上一餐內容，以及睡眠狀態。`,
+      () => ctaLine
+    ],
+    "情境共鳴型": [
+      () => `你是不是也有這種一天？`,
+      () => `${profile.scene}。你其實不是不想變好，只是那一刻真的很累，很想用吃的讓自己放鬆一下。`,
+      () => `所以${topic}不要只用「我不夠自律」解釋。很多時候，是${profile.root}一起影響，讓你越到晚上越難穩。`,
+      () => `例如：${profile.example}。這不是一個壞習慣而已，而是一整天累積後的結果。`,
+      () => `先不用急著戒掉全部。你可以從「${profile.firstStep}」開始，讓下一次比較容易停下來。`,
+      () => ctaLine
+    ],
+    "客戶案例型": [
+      () => `之前有一位客人，也覺得自己${topic}很嚴重。`,
+      () => `他原本以為問題是自己太愛吃，尤其看到${profile.scene}這種情境，就覺得一定是意志力不好。`,
+      () => `但解析後發現，真正卡住的是${profile.root}。他不是沒有努力，而是努力的地方沒有打到核心。`,
+      () => `他的狀況很像這樣：${profile.example}。所以我們不是叫他硬忍，而是先調整最容易失控前的安排。`,
+      () => `後來方向變成：${profile.action}。先讓生活穩一點，減脂才比較能接得住。`,
+      () => ctaLine
+    ],
+    "故事型": [
+      () => `減重最累的，常常不是食物本身。`,
+      () => `對${audience}來說，真正困難的是每天都很忙，還要一直做選擇。遇到${profile.pain}，很容易覺得自己又失敗了。`,
+      () => `但如果把一天攤開來看，你會發現${topic}常常不是單點問題，而是${profile.root}一路累積。`,
+      () => `像這種情境：${profile.example}。最後爆掉的那一刻，只是結果，不一定是真正原因。`,
+      () => `所以今天先不要追求完美，先抓一個最容易調整的地方：「${profile.firstStep}」。`,
+      () => ctaLine
+    ],
+    "二選一互動型": [
+      () => `你比較像 1，白天忍住晚上破功；還是 2，平日控制週末失控？`,
+      () => `如果你是 1，常見卡點是壓力和飽足感；如果你是 2，可能是平日限制太緊，週末身心都想補回來。`,
+      () => `兩種都不是單純不自律，而是${topic}背後的原因不同。${profile.root}，都會影響你能不能穩定。`,
+      () => `例如：${profile.example}。同樣是吃多，但前面的觸發點不一樣，解法也不一樣。`,
+      () => `你可以留言 1 或 2，也可以先記錄三天，看自己是哪一種模式比較常出現。`,
+      () => ctaLine
+    ],
+    "專業口播": [
+      () => `${topic}先記住一個觀念：減脂不是只看一餐，而是看整體策略能不能穩定。`,
+      () => `${audience}常見的困難是${profile.pain}。這時候如果只靠忍耐，通常會越來越累。`,
+      () => `比較好的做法是拆解原因：${profile.root}。你要先知道哪一個最影響你，才知道從哪裡調整。`,
+      () => `例如：${profile.example}。這時候如果只怪晚餐，可能會忽略白天其實沒有吃穩。`,
+      () => `建議先做：${profile.action}。資料不用完美，但要能幫你看出重複模式。`,
+      () => ctaLine
+    ]
+  };
+}
+
+function subtitleLinesFromSegments(segments) {
+  return segments.flatMap((segment) => splitSubtitle(segment.text));
+}
+
+function splitSubtitle(text) {
+  return text
+    .split(/[。！？；]/)
+    .map((s) => s.trim().replace(/^例如：/, "例如："))
+    .filter(Boolean)
+    .flatMap((sentence) => {
+      if (sentence.length <= 18) return [sentence];
+      const chunks = [];
+      for (let i = 0; i < sentence.length; i += 18) {
+        chunks.push(sentence.slice(i, i + 18));
+      }
+      return chunks;
+    });
+}
+
+function storyboardFor(topic, audience, segments, cta, style, profile) {
+  const visuals = [
+    [profile.scene, "近景，人物表情自然疲憊但不負面", trimText(segments[0]?.text || topic, 14), profile.broll],
+    ["教練對鏡頭口播，背景乾淨，有生活化小道具", "中近景，語氣像聊天", trimText(segments[1]?.text || "不是不自律", 14), "辦公桌、便當、咖啡"],
+    ["白板或平板顯示三個卡點：飲食、壓力、睡眠", "固定鏡頭，搭配手勢指向重點", "先找真正卡點", "簡單流程圖、便條紙"],
+    ["生活化 B-roll 呈現一天飲食與壓力累積", "快切但不急躁", "一整天累積", profile.broll],
+    ["手機備忘錄記錄三天觀察項目", "俯拍，畫面留白", "先記錄三天", "手機、日曆、筆記"],
+    ["教練微笑收尾，旁邊留 CTA 字卡空間", "正面中景，語速放慢", trimText(cta, 14), "乾淨背景、品牌色字卡"]
   ];
-  return beats.map(([time, visual, voice, card, broll]) => ({
-    time,
-    visual,
-    voice,
-    card,
-    broll,
-    rhythm: "前 3 秒停頓強，後段語速自然，CTA 留 1 秒空白。",
-    prompt: `9:16, realistic Asian ${audience}, ${visual}, emotion: understood and calm, action related to ${topic}, clean composition, warm natural light, soft green and orange health brand palette, professional lifestyle video still, no misspelled text, no excessive text in image`
-  }));
+  return segments.map((segment, index) => {
+    const [visual, camera, card, broll] = visuals[index] || visuals.at(-1);
+    return {
+      time: segment.time,
+      visual,
+      voice: segment.text,
+      card,
+      broll,
+      rhythm: index === 0 ? "開頭停頓半秒，第一句直接丟痛點。" : index === segments.length - 1 ? "CTA 前留一個短停頓，語氣放柔。" : "自然口語，句子之間保留換氣點。",
+      prompt: `9:16, realistic Asian office worker and health coach, scene: ${visual}, audience: ${audience}, topic: ${topic}, emotion: understood and calm, camera: ${camera}, clean composition, warm natural light, soft green and orange health brand palette, professional lifestyle video still, no misspelled text, no excessive text in image`
+    };
+  });
+}
+
+function legacySegments(s) {
+  return [
+    { label: "開頭", time: "0-3秒", text: s.hook_options?.[0] || "" },
+    { label: "痛點", time: "3-10秒", text: "你可能白天都很努力控制，但一到晚上或壓力大，就開始想補償自己。" },
+    { label: "核心觀念", time: "10-25秒", text: "減脂卡住常常不是單一食物造成，而是生活節奏、壓力、外食選擇和飽足感沒有配合。" },
+    { label: "生活例子", time: "25-40秒", text: "像常外食的人，如果午餐蛋白質太少，下午靠咖啡撐，晚上就更容易嘴饞。" },
+    { label: "行動建議", time: "40-55秒", text: "先不要急著更少吃，先記錄三天：外食、壓力、睡眠、嘴饞時間。" },
+    { label: "CTA", time: "55-60秒", text: `${s.cta}，我提供減脂能量測驗，幫你找出最深的原因。` }
+  ];
 }
 
 function igCaption(topic, audience, cta) {
@@ -987,12 +1259,18 @@ function dmScript(type, topic) {
   return map[type] || map["留言「測驗」"];
 }
 
-function qualityCheck(hook, cta, audience, body) {
+function qualityCheck(hook, cta, audience, body, seconds = 60, segments = []) {
   const issues = [];
+  const bodyLength = body.replace(/\s/g, "").length;
+  const minLength = seconds === 30 ? 85 : seconds === 45 ? 130 : seconds === 90 ? 230 : 175;
+  const maxLength = seconds === 30 ? 210 : seconds === 45 ? 300 : seconds === 90 ? 620 : 430;
   issues.push(hook.length <= 24 ? "Hook 長度 OK，適合 3 秒內丟出。" : "Hook 偏長，建議壓到 24 字內。");
   issues.push(cta ? "CTA 明確，可引導留言或私訊。" : "缺少 CTA，建議補上留言「測驗」或私訊引導。");
   issues.push(audience ? "有具體受眾，內容較容易被對號入座。" : "受眾不明，建議指定外食族、久坐族或壓力型受眾。");
   issues.push(/保證|一定瘦|治療|診斷|神奇|快速瘦/.test(body) ? "偵測到可能過度承諾或醫療化字眼，建議改成較保守說法。" : "未偵測到保證療效、醫療診斷或身材羞辱語氣。");
+  issues.push(bodyLength < minLength ? `口播偏短，${seconds} 秒版本建議再補一個具體情境或例子。` : bodyLength > maxLength ? `口播偏長，${seconds} 秒版本建議刪掉一個解釋句。` : `口播長度符合 ${seconds} 秒版本。`);
+  issues.push(segments.length >= 6 ? "結構完整：開頭、痛點、核心觀念、例子、行動建議、CTA 都有出現。" : "段落不足，建議補齊完整短影音結構。");
+  issues.push(/核心|策略|節奏|卡點/.test(body) && /例如|像/.test(body) ? "有觀念也有生活例子，不會太像教科書。" : "建議加入更生活化例子，避免只講觀念。");
   issues.push(body.length > 900 ? "內容較長，手機閱讀時可拆成更短句。" : "文字長度適合手機閱讀。");
   issues.push("遇到疾病、懷孕、用藥或飲食疾患，請在實際溝通中建議尋求專業醫療人員協助。");
   return issues;
