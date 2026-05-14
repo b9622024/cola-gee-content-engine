@@ -1,12 +1,21 @@
 module.exports = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
 
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (req.method === "GET") {
+    return send(res, 200, {
+      ok: true,
+      service: "analyze-video",
+      openai_key_configured: Boolean(apiKey),
+      message: apiKey ? "API 已部署，OPENAI_API_KEY 已設定。" : "API 已部署，但缺少 OPENAI_API_KEY。"
+    });
+  }
+
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
+    res.setHeader("Allow", "GET, POST");
     return send(res, 405, { error: "不支援的請求方法。" });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return send(res, 500, { error: "缺少 OPENAI_API_KEY，請先在 Vercel 環境變數設定。" });
   }
@@ -15,8 +24,8 @@ module.exports = async function handler(req, res) {
     const body = await readJson(req);
     const video = parseDataUrl(body.video_data_url || "");
     if (!video) return send(res, 400, { error: "請上傳影片檔。" });
-    if (video.buffer.length > 25 * 1024 * 1024) {
-      return send(res, 413, { error: "影片檔超過 25MB。請先裁短或壓縮後再上傳。" });
+    if (video.buffer.length > 4 * 1024 * 1024) {
+      return send(res, 413, { error: "影片檔目前建議小於 4MB。Vercel 會限制請求大小，請先裁短或壓縮後再上傳。" });
     }
 
     const transcript = await transcribeVideo(apiKey, video, body.file_name || "competitor-video.mp4");
@@ -137,7 +146,7 @@ function readJson(req) {
     req.on("data", (chunk) => {
       raw += chunk;
       if (raw.length > 38_000_000) {
-        reject(new Error("影片資料太大，請改上傳 25MB 以下影片。"));
+        reject(new Error("影片資料太大，請改上傳 4MB 以下影片。"));
         req.destroy();
       }
     });
