@@ -751,16 +751,30 @@ async function autoAnalyzeUploadedVideo() {
   }
   try {
     setVideoAnalysisProgress("準備影片", 5, `已選擇 ${file.name}，檔案大小 ${Math.round(file.size / 1024 / 1024 * 10) / 10} MB。`);
-    const framesPromise = extractVideoFrames(file, 3);
-    const videoPayloadPromise = useBlobUpload
-      ? uploadCompetitorVideoToBlob(file, (percentage) => {
-          const mapped = 10 + percentage * 0.45;
-          setVideoAnalysisProgress("上傳到 Vercel Blob", mapped, `正在上傳影片：${Math.round(percentage)}%。上傳完成後會自動進入 AI 分析。`);
-        })
-      : fileToDataUrl(file);
-    setVideoAnalysisProgress(useBlobUpload ? "上傳與抽取畫面" : "抽取畫面", 10, "正在從影片抽取 3 張關鍵畫面，用來分析分鏡節奏。");
-    const [videoPayload, frames] = await Promise.all([videoPayloadPromise, framesPromise]);
-    setVideoAnalysisProgress("影片已就緒", 58, useBlobUpload ? "Blob 上傳完成，關鍵畫面也已抽取完成。" : "影片與關鍵畫面已讀取完成。");
+    setVideoAnalysisProgress("抽取關鍵畫面", 8, "正在嘗試從影片抽取 3 張關鍵畫面；如果影片格式不支援，會自動跳過這步。");
+    const framesPromise = withSoftTimeout(
+      extractVideoFrames(file, 3),
+      25000,
+      [],
+      "抽取關鍵畫面等待太久，已先跳過畫面截圖，繼續分析逐字稿。"
+    );
+    const frames = await framesPromise;
+    const frameDetail = frames.length
+      ? `已抽取 ${frames.length} 張關鍵畫面。`
+      : "未取得關鍵畫面，會先用影片逐字稿與你填寫的欄位分析。";
+
+    setVideoAnalysisProgress(useBlobUpload ? "準備上傳 Blob" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
+    const videoPayload = useBlobUpload
+      ? await withTimeout(
+          uploadCompetitorVideoToBlob(file, (percentage) => {
+            const mapped = 18 + percentage * 0.42;
+            setVideoAnalysisProgress("上傳到 Vercel Blob", mapped, `正在上傳影片：${Math.round(percentage)}%。上傳完成後會自動進入 AI 分析。`);
+          }),
+          240000,
+          "影片上傳超過 4 分鐘沒有完成，請確認網路或改用較短影片。"
+        )
+      : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
+    setVideoAnalysisProgress("影片已就緒", 62, useBlobUpload ? "Blob 上傳完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
     if (output && useBlobUpload) output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
     startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
@@ -835,8 +849,10 @@ async function autoAnalyzeUploadedVideo() {
 }
 
 async function uploadCompetitorVideoToBlob(file, onProgress) {
+  setVideoAnalysisProgress("載入上傳模組", 16, "正在載入站內 Blob 上傳工具。");
   const { upload } = await import("/vendor/vercel-blob-client.js");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
+  setVideoAnalysisProgress("取得上傳授權", 18, "正在向 Vercel 取得 Blob 上傳授權。");
   const blob = await upload(safeName, file, {
     access: "public",
     handleUploadUrl: "/api/upload-video",
@@ -848,6 +864,23 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
     }
   });
   return blob.url;
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function withSoftTimeout(promise, timeoutMs, fallbackValue, fallbackMessage) {
+  try {
+    return await withTimeout(promise, timeoutMs, fallbackMessage);
+  } catch (error) {
+    setVideoAnalysisProgress("略過關鍵畫面", 14, error.message || fallbackMessage);
+    return fallbackValue;
+  }
 }
 
 function fileToDataUrl(file) {
@@ -866,12 +899,20 @@ function extractVideoFrames(file, count = 6) {
     const ctx = canvas.getContext("2d");
     const url = URL.createObjectURL(file);
     const frames = [];
+    let settled = false;
+    const failSafe = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      URL.revokeObjectURL(url);
+      reject(new Error("瀏覽器無法在時間內讀取影片畫面，已略過關鍵畫面抽取。"));
+    }, 22000);
     video.preload = "metadata";
     video.muted = true;
     video.playsInline = true;
     video.src = url;
 
     video.onloadedmetadata = async () => {
+      if (settled) return;
       try {
         const duration = Math.max(video.duration || 1, 1);
         canvas.width = 360;
@@ -900,14 +941,21 @@ function extractVideoFrames(file, count = 6) {
           ctx.drawImage(video, dx, dy, drawWidth, drawHeight);
           frames.push(canvas.toDataURL("image/jpeg", 0.72));
         }
+        settled = true;
+        clearTimeout(failSafe);
         URL.revokeObjectURL(url);
         resolve(frames);
       } catch (error) {
+        settled = true;
+        clearTimeout(failSafe);
         URL.revokeObjectURL(url);
         reject(error);
       }
     };
     video.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(failSafe);
       URL.revokeObjectURL(url);
       reject(new Error("影片讀取失敗，請確認檔案格式。"));
     };
