@@ -43,9 +43,6 @@ module.exports = async function handler(req, res) {
             createdAt: new Date().toISOString()
           })
         };
-      },
-      onUploadCompleted: async ({ blob }) => {
-        console.log("competitor video upload completed", blob.url);
       }
     });
 

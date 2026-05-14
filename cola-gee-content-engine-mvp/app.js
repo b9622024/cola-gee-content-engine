@@ -883,6 +883,8 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
     900000,
     "影片上傳或取得 Blob 授權超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
   );
+  if (typeof onProgress === "function") onProgress(100);
+  setVideoAnalysisProgress("Blob 上傳完成", 60, "影片已上傳完成，正在進入 AI 轉逐字稿與分析。");
   return blob.url;
 }
 
