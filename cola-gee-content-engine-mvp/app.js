@@ -16,6 +16,88 @@ const defaults = {
   hookTypes: ["打臉迷思", "自我檢查", "故事案例", "情境共鳴", "二選一互動", "專業解析"],
   statuses: ["靈感", "已產出", "待製作", "已發布", "已追蹤成效"],
   templates: ["打臉迷思型", "自我檢查型", "故事型", "情境共鳴型", "客戶案例型", "二選一互動型", "專業口播"],
+  scriptFormulas: [
+    {
+      id: "counter-intuitive",
+      name: "反常識開頭",
+      best_for: "流量型、轉換型",
+      hook_pattern: "你以為 A，其實真正卡住的是 B",
+      structure: "反常識 Hook → 常見誤會 → 真正原因 → 生活例子 → 小行動 → CTA",
+      borrow_point: "用一句話打破受眾原本的判斷，讓人想知道自己是不是也搞錯。"
+    },
+    {
+      id: "three-checks",
+      name: "三點自我檢查",
+      best_for: "互動型、專業型",
+      hook_pattern: "如果你有這 3 個狀況，先別急著怪自己",
+      structure: "3 個症狀 → 代表的卡點 → 為什麼會發生 → 第一個檢查動作 → CTA",
+      borrow_point: "用清單感降低理解成本，也更容易引導留言。"
+    },
+    {
+      id: "day-in-life",
+      name: "一天情境共鳴",
+      best_for: "共鳴型、流量型",
+      hook_pattern: "你是不是也有這種一天？",
+      structure: "真實一天 → 失控瞬間 → 背後原因 → 不是不自律 → 小建議 → CTA",
+      borrow_point: "用生活畫面提高停留，讓受眾先覺得被理解。"
+    },
+    {
+      id: "case-breakdown",
+      name: "案例拆解",
+      best_for: "專業型、轉換型",
+      hook_pattern: "有位客人一直以為問題是 A，結果真正卡在 B",
+      structure: "客戶狀況 → 原本以為的問題 → 解析後卡點 → 調整方向 → CTA",
+      borrow_point: "用故事建立信任，但避免承諾結果或誇大前後對比。"
+    },
+    {
+      id: "either-or",
+      name: "二選一互動",
+      best_for: "互動型",
+      hook_pattern: "你是 1，還是 2？",
+      structure: "二選一問題 → 兩種狀況差異 → 各自卡點 → 留言引導 → CTA",
+      borrow_point: "降低留言門檻，讓觀眾只要選數字就能互動。"
+    },
+    {
+      id: "failure-reason",
+      name: "失敗原因拆解",
+      best_for: "轉換型、共鳴型",
+      hook_pattern: "為什麼你每次都卡在同一個地方？",
+      structure: "重複失敗情境 → 不是單一問題 → 三個常見原因 → 優先順序 → CTA",
+      borrow_point: "把挫折轉成可診斷的卡點，適合引導測驗。"
+    }
+  ],
+  marketResearch: [
+    {
+      id: "research-retention-first-3-sec",
+      platform: "Short-form video",
+      industry: "健康 / 減重 / 教育型內容",
+      topic: "前三秒停留",
+      hook: "直接點出痛點或反常識，不先鋪陳背景",
+      structure: "0-3 秒先給痛點或反差，3-10 秒說明為什麼跟觀眾有關，後面才進入觀念。",
+      insight: "短影音最先要解決的是停留，不是完整教學。開頭要讓觀眾立刻知道這支影片和自己有關。",
+      adapt_to_brand: "用「你不是不自律」這類理解式語氣，而不是恐嚇或羞辱。"
+    },
+    {
+      id: "research-checklist-comments",
+      platform: "IG Reels / Threads",
+      industry: "減重教練 / 健康教育",
+      topic: "自我檢查型內容",
+      hook: "如果你有這 3 個狀況，代表你可能卡在...",
+      structure: "列症狀 → 解釋共同根源 → 邀請留言測驗或選項。",
+      insight: "清單型內容容易收藏，也容易讓受眾對號入座。",
+      adapt_to_brand: "把症狀寫成生活狀況，不寫成醫療診斷。"
+    },
+    {
+      id: "research-native-story",
+      platform: "TikTok / Reels",
+      industry: "生活化健康內容",
+      topic: "情境故事",
+      hook: "白天都忍住，晚上卻爆吃？",
+      structure: "生活場景 → 情緒承接 → 背後原因 → 小行動。",
+      insight: "越像真人在講自己的觀察，越不像廣告，也越容易看完。",
+      adapt_to_brand: "用崇銘老師口吻自然承接，不急著賣 1499 體驗。"
+    }
+  ],
   cloud: {
     workspaceId: "cola-gee-main",
     syncToken: "",
@@ -125,10 +207,12 @@ function loadState() {
     settings: structuredClone(defaults),
     content_ideas: sampleIdeas,
     content_calendar: createWeeklySchedule({ goal: "增加自然流量", topics: ["壓力與減脂", "外食減脂", "減重停滯期"], cta: "留言「測驗」", avoid: "", count: 7 }, false),
-    scripts: sampleIdeas.map((idea) => makeScript(idea.topic, idea.audience, idea.content_goal, "60 秒", idea.hook_type + "型", idea.cta, idea.id)),
+    scripts: sampleIdeas.map((idea) => makeScript(idea.topic, idea.audience, idea.content_goal, "60 秒", formulaForHookType(idea.hook_type), idea.hook_type + "型", idea.cta, idea.id)),
     carousel_posts: sampleIdeas.map((idea) => makeCarousel(idea.topic, idea.content_goal, idea.audience, 7, "日式雜誌風", idea.cta, idea.id)),
     social_copy: sampleIdeas.map((idea) => makeSocialCopy(idea.topic, idea.audience, idea.content_goal, idea.cta, idea.id)),
-    performance_metrics: sampleMetrics
+    performance_metrics: sampleMetrics,
+    script_formulas: structuredClone(defaults.scriptFormulas),
+    market_research: structuredClone(defaults.marketResearch)
   };
   localStorage.setItem(STORE_KEY, JSON.stringify(initial));
   return initial;
@@ -142,6 +226,8 @@ function normalizeState(saved) {
     brand: { ...defaults.brand, ...(settings.brand || {}) },
     cloud: { ...defaults.cloud, ...(settings.cloud || {}) }
   };
+  saved.script_formulas = saved.script_formulas?.length ? saved.script_formulas : structuredClone(defaults.scriptFormulas);
+  saved.market_research = saved.market_research?.length ? saved.market_research : structuredClone(defaults.marketResearch);
   return saved;
 }
 
@@ -154,6 +240,7 @@ function render() {
     dashboard: ["首頁儀表板", "追蹤本週內容與名單來源，快速看出值得加碼的素材。", renderDashboard],
     calendar: ["內容排程", "產生、編輯與匯出一週 7 天內容排程。", renderCalendar],
     "script-generator": ["腳本產生", "產出 Hook、口播、字幕、分鏡、封面與貼文文案。", renderScriptGenerator],
+    research: ["流量研究", "管理高流量腳本公式與市場研究素材，供腳本產生器借鑑。", renderResearch],
     "carousel-generator": ["連播圖文", "產出 6 到 8 頁連播圖文大綱與圖像提示詞。", renderCarouselGenerator],
     "copy-generator": ["社群文案", "產出 IG、Threads、限動互動與留言後私訊話術。", renderCopyGenerator],
     performance: ["成效追蹤", "手動輸入數據，分析主題、Hook、CTA 與內容形式。", renderPerformance],
@@ -172,6 +259,7 @@ function render() {
           ${navButton("dashboard", "⌂", "首頁儀表板")}
           ${navButton("calendar", "□", "內容排程")}
           ${navButton("script-generator", "▶", "腳本產生")}
+          ${navButton("research", "◎", "流量研究")}
           ${navButton("carousel-generator", "▤", "連播圖文")}
           ${navButton("copy-generator", "✎", "社群文案")}
           ${navButton("performance", "↗", "成效追蹤")}
@@ -412,12 +500,109 @@ function createWeeklySchedule(input, persistIdeas) {
   return rows;
 }
 
+function renderResearch() {
+  return `
+    <div class="grid two">
+      <div class="panel">
+        <h3>新增高流量腳本公式</h3>
+        <div class="form">
+          ${inputField("formulaName", "公式名稱", "text", "反常識開頭", "span-6")}
+          ${inputField("formulaBestFor", "適合目標", "text", "流量型、轉換型", "span-6")}
+          ${inputField("formulaHook", "Hook 公式", "text", "你以為 A，其實真正卡住的是 B", "span-12")}
+          ${textareaField("formulaStructure", "腳本結構", "反常識 Hook → 常見誤會 → 真正原因 → 生活例子 → 小行動 → CTA", "span-12")}
+          ${textareaField("formulaBorrow", "可借鑑重點", "用一句話打破受眾原本的判斷，讓人想知道自己是不是也搞錯。", "span-12")}
+          <div class="field span-12"><button class="btn" onclick="addScriptFormula()">加入公式資料庫</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>新增市場研究素材</h3>
+        <div class="form">
+          ${inputField("researchPlatform", "平台", "text", "IG Reels / TikTok", "span-6")}
+          ${inputField("researchIndustry", "帳號或產業類型", "text", "減重教練 / 健康教育", "span-6")}
+          ${inputField("researchTopic", "主題", "text", "壓力暴食", "span-6")}
+          ${inputField("researchHook", "可借鑑 Hook", "text", "白天忍住，晚上卻爆吃？", "span-6")}
+          ${textareaField("researchStructure", "可借鑑腳本節奏", "生活場景 → 情緒承接 → 背後原因 → 小行動", "span-12")}
+          ${textareaField("researchInsight", "為什麼值得參考", "開頭有明確痛點，容易讓目標受眾覺得和自己有關。", "span-12")}
+          ${textareaField("researchAdapt", "改寫成可樂吉語氣", "用理解式語氣，不製造焦慮，不直接推銷。", "span-12")}
+          <div class="field span-12"><button class="btn" onclick="addMarketResearch()">加入市場素材庫</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="panel">
+        <div class="split-title">
+          <h3>高流量腳本公式資料庫</h3>
+          <span class="tag">${state.script_formulas.length} 筆</span>
+        </div>
+        <div class="list">
+          ${state.script_formulas.map((formula) => `
+            <div class="item">
+              <strong>${formula.name}</strong>
+              <p class="muted">適合：${formula.best_for}</p>
+              <p><b>Hook：</b>${formula.hook_pattern}</p>
+              <p><b>結構：</b>${formula.structure}</p>
+              <p class="muted">${formula.borrow_point}</p>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="split-title">
+          <h3>市場研究素材庫</h3>
+          <span class="tag">${state.market_research.length} 筆</span>
+        </div>
+        <div class="list">
+          ${state.market_research.map((item) => `
+            <div class="item">
+              <strong>${item.topic}｜${item.platform}</strong>
+              <p class="muted">${item.industry}</p>
+              <p><b>Hook：</b>${item.hook}</p>
+              <p><b>節奏：</b>${item.structure}</p>
+              <p><b>洞察：</b>${item.insight}</p>
+              <p class="muted"><b>品牌改寫：</b>${item.adapt_to_brand}</p>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function addScriptFormula() {
+  state.script_formulas.unshift({
+    id: uid("formula"),
+    name: val("formulaName"),
+    best_for: val("formulaBestFor"),
+    hook_pattern: val("formulaHook"),
+    structure: val("formulaStructure"),
+    borrow_point: val("formulaBorrow")
+  });
+  save();
+  render();
+}
+
+function addMarketResearch() {
+  state.market_research.unshift({
+    id: uid("research"),
+    platform: val("researchPlatform"),
+    industry: val("researchIndustry"),
+    topic: val("researchTopic"),
+    hook: val("researchHook"),
+    structure: val("researchStructure"),
+    insight: val("researchInsight"),
+    adapt_to_brand: val("researchAdapt")
+  });
+  save();
+  render();
+}
+
 function renderScriptGenerator() {
   return generatorShell("script", `
     ${inputField("scriptTopic", "主題", "text", "壓力與減脂", "span-4")}
     ${selectField("scriptAudience", "目標受眾", state.settings.audiences, "壓力大會亂吃的人", "span-4")}
     ${selectField("scriptGoal", "內容目標", state.settings.goals, "共鳴型", "span-2")}
     ${selectField("scriptLength", "影片長度", ["30 秒", "45 秒", "60 秒", "90 秒"], "60 秒", "span-2")}
+    ${selectField("scriptFormula", "流量腳本公式", formulaOptions(), "day-in-life", "span-4")}
     ${selectField("scriptStyle", "風格 / 模板", state.settings.templates, "情境共鳴型", "span-4")}
     ${selectField("scriptCta", "CTA", state.settings.ctas, "留言「測驗」", "span-4")}
     <div class="field span-4"><button class="btn" onclick="generateScript()">產生短影音腳本</button></div>
@@ -425,7 +610,7 @@ function renderScriptGenerator() {
 }
 
 function generateScript() {
-  const script = makeScript(val("scriptTopic"), val("scriptAudience"), val("scriptGoal"), val("scriptLength"), val("scriptStyle"), val("scriptCta"), uid("idea"));
+  const script = makeScript(val("scriptTopic"), val("scriptAudience"), val("scriptGoal"), val("scriptLength"), val("scriptFormula"), val("scriptStyle"), val("scriptCta"), uid("idea"));
   state.scripts.unshift(script);
   state.content_ideas.unshift({
     id: script.content_id,
@@ -434,7 +619,7 @@ function generateScript() {
     audience: script.audience,
     content_goal: script.content_goal,
     content_format: "短影音",
-    hook_type: normalizeHookType(val("scriptStyle")),
+    hook_type: script.formula?.name || normalizeHookType(val("scriptStyle")),
     cta: script.cta,
     status: "已產出",
     created_at: iso(),
@@ -444,11 +629,17 @@ function generateScript() {
   renderOutput(formatScript(script), "短影音腳本已產出");
 }
 
-function makeScript(topic, audience, goal, length, style, cta, contentId) {
+function formulaOptions() {
+  return state.script_formulas.map((formula) => ({ label: formula.name, value: formula.id }));
+}
+
+function makeScript(topic, audience, goal, length, formulaId, style, cta, contentId) {
   const profile = scriptTopicProfile(topic, audience);
+  const formula = findFormula(formulaId, style);
+  const research = relatedResearch(topic, audience, formula);
   const seconds = parseDuration(length);
-  const hooks = hookOptionsFor(topic, audience, goal, style, profile);
-  const segments = scriptSegments(topic, audience, goal, seconds, style, cta, profile, hooks[0]);
+  const hooks = hookOptionsFor(topic, audience, goal, style, profile, formula, research);
+  const segments = scriptSegments(topic, audience, goal, seconds, style, cta, profile, hooks[0], formula, research);
   const spoken = segments.map((segment) => segment.text).join("\n\n");
   const subtitles = subtitleLinesFromSegments(segments);
   const storyboard = storyboardFor(topic, audience, segments, cta, style, profile);
@@ -460,6 +651,8 @@ function makeScript(topic, audience, goal, length, style, cta, contentId) {
     content_goal: goal,
     length,
     style,
+    formula,
+    research,
     cta,
     segments,
     hook_options: hooks,
@@ -881,8 +1074,15 @@ function formatScript(s) {
 內容目標：${s.content_goal}
 目標受眾：${s.audience}
 影片長度：${s.length}
+流量腳本公式：${s.formula?.name || "未指定"}
 風格：${s.style}
 CTA：${s.cta}
+
+## 參考公式與市場素材
+公式結構：${s.formula?.structure || "未指定"}
+可借鑑重點：${s.formula?.borrow_point || "未指定"}
+市場素材參考：
+${(s.research || []).slice(0, 3).map((item) => `- ${item.platform}｜${item.topic}：${item.insight}`).join("\n") || "- 尚未找到相關素材，建議到「流量研究」新增。"}
 
 ## A. Hook 選項
 ${s.hook_options.map((h, i) => `${i + 1}. ${h}`).join("\n")}
@@ -1042,7 +1242,47 @@ function scriptTopicProfile(topic, audience) {
   return profile;
 }
 
-function hookOptionsFor(topic, audience, goal, style, profile) {
+function findFormula(formulaId, style = "") {
+  const found = state.script_formulas.find((formula) => formula.id === formulaId || formula.name === formulaId);
+  if (found) return found;
+  return state.script_formulas.find((formula) => formula.id === formulaForStyle(style)) || state.script_formulas[0];
+}
+
+function formulaForHookType(hookType = "") {
+  if (hookType.includes("打臉") || hookType.includes("反常識")) return "counter-intuitive";
+  if (hookType.includes("檢查")) return "three-checks";
+  if (hookType.includes("案例") || hookType.includes("故事")) return "case-breakdown";
+  if (hookType.includes("情境")) return "day-in-life";
+  if (hookType.includes("二選一")) return "either-or";
+  return "counter-intuitive";
+}
+
+function formulaForStyle(style = "") {
+  if (style.includes("打臉")) return "counter-intuitive";
+  if (style.includes("檢查")) return "three-checks";
+  if (style.includes("案例")) return "case-breakdown";
+  if (style.includes("故事") || style.includes("情境")) return "day-in-life";
+  if (style.includes("二選一")) return "either-or";
+  return "counter-intuitive";
+}
+
+function relatedResearch(topic, audience, formula) {
+  const topicKey = String(topic || "").replace(/減脂|減重|與/g, "");
+  const scored = state.market_research.map((item) => {
+    const haystack = `${item.platform} ${item.industry} ${item.topic} ${item.hook} ${item.structure} ${item.insight} ${item.adapt_to_brand}`;
+    let score = 0;
+    if (haystack.includes(topic)) score += 4;
+    if (topicKey && haystack.includes(topicKey)) score += 2;
+    if (haystack.includes(audience)) score += 2;
+    if (formula && haystack.includes(formula.name)) score += 1;
+    if (/Hook|前三秒|停留|情境|自我檢查|清單/.test(haystack)) score += 1;
+    return { item, score };
+  });
+  const matched = scored.filter((x) => x.score > 0).sort((a, b) => b.score - a.score).map((x) => x.item);
+  return matched.length ? matched.slice(0, 3) : state.market_research.slice(0, 3);
+}
+
+function hookOptionsFor(topic, audience, goal, style, profile, formula, research = []) {
   const styleHooks = {
     "打臉迷思型": [
       `${topic}卡住，不一定是你不夠努力`,
@@ -1080,20 +1320,38 @@ function hookOptionsFor(topic, audience, goal, style, profile) {
       `不是少吃就好，重點是策略能不能穩定`
     ]
   };
-  const hooks = styleHooks[style] || styleHooks["專業口播"];
+  const formulaHooks = {
+    "counter-intuitive": [`${topic}卡住，不一定是你以為的原因`, `你以為是意志力，其實可能是策略錯位`, `先別再少吃，${topic}可能卡在別處`],
+    "three-checks": [`有這 3 個狀況，難怪${topic}卡住`, `${audience}先檢查這 3 件事`, `減不下來前，先看這 3 個訊號`],
+    "day-in-life": [`你是不是也有這種減重的一天？`, `白天很努力，晚上卻又破功？`, `${audience}最常輸在生活節奏`],
+    "case-breakdown": [`有位客人一直以為自己吃太多`, `他卡住 2 個月，問題不是晚餐`, `一個${audience}的減脂卡點案例`],
+    "either-or": [`你是外食型，還是壓力型？`, `你比較像 1，還是 2？`, `留言 1 或 2，我猜你卡在哪`],
+    "failure-reason": [`為什麼你每次都卡在同一個地方？`, `你不是失敗，是卡點一直沒被處理`, `${topic}反覆卡住，先看這個原因`]
+  };
+  const hooks = [...(formulaHooks[formula?.id] || []), ...(styleHooks[style] || styleHooks["專業口播"])];
+  if (research[0]?.hook) hooks.splice(1, 0, research[0].hook);
   if (goal === "轉換型") hooks[2] = `想找出${topic}真正卡點，先做這個檢查`;
-  return hooks.map((h) => trimText(h, 30));
+  return [...new Set(hooks)].slice(0, 3).map((h) => trimText(h, 30));
 }
 
-function scriptSegments(topic, audience, goal, seconds, style, cta, profile, selectedHook) {
+function scriptSegments(topic, audience, goal, seconds, style, cta, profile, selectedHook, formula, research = []) {
   const timings = segmentTimings(seconds);
   const builders = templateBuilders(topic, audience, profile, cta);
-  const key = builders[style] ? style : "專業口播";
+  const formulaStyle = {
+    "counter-intuitive": "打臉迷思型",
+    "three-checks": "自我檢查型",
+    "day-in-life": "情境共鳴型",
+    "case-breakdown": "客戶案例型",
+    "either-or": "二選一互動型",
+    "failure-reason": "自我檢查型"
+  }[formula?.id];
+  const key = builders[formulaStyle] ? formulaStyle : builders[style] ? style : "專業口播";
   return timings.map((timing, index) => {
     const part = builders[key][index] || builders["專業口播"][index];
+    const marketHint = index === 0 && research[0]?.hook ? research[0].hook : "";
     return {
       ...timing,
-      text: adaptSegmentText(part(timing, selectedHook, goal), timing.label, seconds, profile, topic, audience)
+      text: adaptSegmentText(part(timing, selectedHook || marketHint, goal), timing.label, seconds, profile, topic, audience)
     };
   });
 }
@@ -1449,7 +1707,11 @@ function download(name, text) {
 }
 
 function selectField(id, label, options, selected, cls) {
-  return `<div class="field ${cls}"><label for="${id}">${label}</label><select id="${id}">${options.map((o) => `<option ${String(o) === String(selected) ? "selected" : ""}>${o}</option>`).join("")}</select></div>`;
+  return `<div class="field ${cls}"><label for="${id}">${label}</label><select id="${id}">${options.map((o) => {
+    const value = typeof o === "object" ? o.value : o;
+    const labelText = typeof o === "object" ? o.label : o;
+    return `<option value="${escapeHtml(String(value))}" ${String(value) === String(selected) ? "selected" : ""}>${escapeHtml(String(labelText))}</option>`;
+  }).join("")}</select></div>`;
 }
 
 function inputField(id, label, type, value, cls) {
