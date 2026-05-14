@@ -16,6 +16,18 @@
       "dest": "/api/$1.js"
     },
     {
+      "src": "/app.js",
+      "dest": "/app.js"
+    },
+    {
+      "src": "/styles.css",
+      "dest": "/styles.css"
+    },
+    {
+      "src": "/(.*\\.(?:html|js|css|json|png|jpg|jpeg|gif|svg|ico|webp|mp4|webm))",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
