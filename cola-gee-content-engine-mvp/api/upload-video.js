@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const { handleUpload } = await import("@vercel/blob/client");
-    const body = req.body && typeof req.body === "object" ? req.body : await readJson(req);
+    const body = await getRequestBody(req);
     const jsonResponse = await handleUpload({
       body,
       request: req,
@@ -55,22 +55,50 @@ module.exports = async function handler(req, res) {
   }
 };
 
+async function getRequestBody(req) {
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(req.body)) {
+    try {
+      return req.body.length ? JSON.parse(req.body.toString("utf8")) : {};
+    } catch (error) {
+      throw new Error("上傳授權資料格式錯誤。");
+    }
+  }
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") {
+    try {
+      return req.body ? JSON.parse(req.body) : {};
+    } catch (error) {
+      throw new Error("上傳授權資料格式錯誤。");
+    }
+  }
+  return readJson(req);
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
+    const timer = setTimeout(() => {
+      reject(new Error("讀取上傳授權資料逾時，請重新整理後再試一次。"));
+    }, 12000);
     req.on("data", (chunk) => {
       raw += chunk;
       if (raw.length > 1_000_000) {
+        clearTimeout(timer);
         reject(new Error("上傳設定資料太大。"));
         req.destroy();
       }
     });
     req.on("end", () => {
+      clearTimeout(timer);
       try {
         resolve(raw ? JSON.parse(raw) : {});
       } catch (error) {
         reject(error);
       }
+    });
+    req.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
     });
   });
 }

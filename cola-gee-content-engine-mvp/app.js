@@ -770,8 +770,8 @@ async function autoAnalyzeUploadedVideo() {
             const mapped = 18 + percentage * 0.42;
             setVideoAnalysisProgress("上傳到 Vercel Blob", mapped, `正在上傳影片：${Math.round(percentage)}%。上傳完成後會自動進入 AI 分析。`);
           }),
-          240000,
-          "影片上傳超過 4 分鐘沒有完成，請確認網路或改用較短影片。"
+          900000,
+          "影片上傳超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
         )
       : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
     setVideoAnalysisProgress("影片已就緒", 62, useBlobUpload ? "Blob 上傳完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
@@ -852,18 +852,45 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
   setVideoAnalysisProgress("載入上傳模組", 16, "正在載入站內 Blob 上傳工具。");
   const { upload } = await import("/vendor/vercel-blob-client.js");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
-  setVideoAnalysisProgress("取得上傳授權", 18, "正在向 Vercel 取得 Blob 上傳授權。");
-  const blob = await upload(safeName, file, {
-    access: "public",
-    handleUploadUrl: "/api/upload-video",
-    contentType: file.type || "video/mp4",
-    onUploadProgress(event) {
-      if (typeof onProgress === "function") {
-        onProgress(event.percentage || 0);
+  setVideoAnalysisProgress("檢查上傳授權", 17, "正在確認 Vercel Blob 授權 API 是否正常回應。");
+  await preflightBlobUploadToken(safeName);
+  setVideoAnalysisProgress("開始上傳 Blob", 20, "Blob 授權正常，正在開始上傳影片。");
+  const blob = await withTimeout(
+    upload(safeName, file, {
+      access: "public",
+      handleUploadUrl: "/api/upload-video",
+      contentType: file.type || "video/mp4",
+      onUploadProgress(event) {
+        if (typeof onProgress === "function") {
+          onProgress(event.percentage || 0);
+        }
       }
-    }
-  });
+    }),
+    900000,
+    "影片上傳或取得 Blob 授權超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
+  );
   return blob.url;
+}
+
+async function preflightBlobUploadToken(pathname) {
+  const response = await fetchWithTimeout("/api/upload-video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "blob.generate-client-token",
+      payload: {
+        pathname,
+        callbackUrl: `${window.location.origin}/api/upload-video`,
+        clientPayload: null,
+        multipart: false
+      }
+    })
+  }, 30000, "Vercel Blob 上傳授權 API 超過 30 秒沒有回應。請檢查 api/upload-video.js 是否已部署，以及 BLOB_READ_WRITE_TOKEN 是否有效。");
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.clientToken) {
+    throw new Error(data.error || `Vercel Blob 上傳授權失敗：HTTP ${response.status}`);
+  }
+  return data.clientToken;
 }
 
 function withTimeout(promise, timeoutMs, message) {
@@ -872,6 +899,17 @@ function withTimeout(promise, timeoutMs, message) {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function fetchWithTimeout(url, options, timeoutMs, message) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch((error) => {
+      if (error.name === "AbortError") throw new Error(message);
+      throw error;
+    })
+    .finally(() => clearTimeout(timer));
 }
 
 async function withSoftTimeout(promise, timeoutMs, fallbackValue, fallbackMessage) {
