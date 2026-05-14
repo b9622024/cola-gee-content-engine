@@ -20,7 +20,7 @@ const server = http.createServer((req, res) => {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store"
     });
-    res.end(JSON.stringify({ error: "本機伺服器未啟用雲端 API，請部署到 Vercel 後使用雲端同步。" }));
+    res.end(JSON.stringify({ error: "本機伺服器未啟用雲端 API，請部署到 Vercel 後使用雲端同步或 AI 影片分析。" }));
     return;
   }
   let filePath = path.join(root, url.pathname === "/" ? "index.html" : url.pathname);

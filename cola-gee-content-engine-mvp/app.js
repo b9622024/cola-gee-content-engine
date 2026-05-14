@@ -536,6 +536,7 @@ function renderResearch() {
         ${textareaField("compWhy", "你覺得它紅的原因", "例如：痛點很準、留言門檻低、Hook 很像我的日常。", "span-12")}
         <div class="field span-12">
           <div class="actions">
+            <button class="btn warn" onclick="autoAnalyzeUploadedVideo()">自動分析上傳影片</button>
             <button class="btn" onclick="analyzeCompetitorVideo()">分析並改寫</button>
             <button class="btn secondary" onclick="copyCurrentCompetitorAnalysis()">複製分析結果</button>
           </div>
@@ -645,6 +646,146 @@ function handleCompetitorVideoUpload(input) {
     </div>
     <video controls src="${url}"></video>
   `;
+}
+
+async function autoAnalyzeUploadedVideo() {
+  const file = document.getElementById("compVideoFile")?.files?.[0];
+  const output = document.getElementById("competitorAnalysisOutput");
+  if (!file) {
+    if (output) output.textContent = "請先選擇影片檔，再按「自動分析上傳影片」。";
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    if (output) output.textContent = "影片超過 25MB。請先裁短或壓縮後再上傳。";
+    return;
+  }
+  if (output) output.textContent = "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
+  try {
+    const [videoDataUrl, frames] = await Promise.all([
+      fileToDataUrl(file),
+      extractVideoFrames(file, 6)
+    ]);
+    const response = await fetch("/api/analyze-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_name: file.name,
+        video_data_url: videoDataUrl,
+        frames,
+        source_url: val("compUrl"),
+        platform: val("compPlatform"),
+        account_type: val("compAccountType"),
+        topic: val("compTargetTopic"),
+        audience: val("compTargetAudience"),
+        cta: val("compCta"),
+        hook: val("compHook")
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "自動影片分析失敗。");
+    if (document.getElementById("compTranscript")) {
+      document.getElementById("compTranscript").value = data.transcript || "";
+    }
+    const markdown = data.analysis || "AI 沒有回傳分析內容。";
+    if (output) output.textContent = markdown;
+    state.competitor_analyses.unshift({
+      id: uid("auto-video"),
+      created_at: iso(),
+      input_type: "上傳影片自動分析",
+      url: val("compUrl"),
+      file_name: file.name,
+      platform: val("compPlatform"),
+      account_type: val("compAccountType"),
+      topic: val("compTargetTopic"),
+      audience: val("compTargetAudience"),
+      views: numVal("compViews"),
+      comments: numVal("compComments"),
+      shares: numVal("compShares"),
+      saves: numVal("compSaves"),
+      detected_formula: { name: "AI 自動分析", id: "auto-ai" },
+      viral_reason: ["已透過影片逐字稿與關鍵畫面自動分析。"],
+      rewrite_hooks: ["請查看上方 AI 分析結果。"],
+      auto_analysis_markdown: markdown
+    });
+    save();
+  } catch (error) {
+    if (output) output.textContent = `自動分析失敗：${error.message}`;
+  }
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function extractVideoFrames(file, count = 6) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const url = URL.createObjectURL(file);
+    const frames = [];
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    video.onloadedmetadata = async () => {
+      try {
+        const duration = Math.max(video.duration || 1, 1);
+        canvas.width = 360;
+        canvas.height = 640;
+        for (let i = 0; i < count; i++) {
+          const ratio = count === 1 ? 0.5 : (i + 0.5) / count;
+          const time = Math.min(duration - 0.1, Math.max(0, duration * ratio));
+          await seekVideo(video, time);
+          const videoRatio = video.videoWidth / video.videoHeight;
+          const canvasRatio = canvas.width / canvas.height;
+          let drawWidth = canvas.width;
+          let drawHeight = canvas.height;
+          let dx = 0;
+          let dy = 0;
+          if (videoRatio > canvasRatio) {
+            drawHeight = canvas.height;
+            drawWidth = drawHeight * videoRatio;
+            dx = (canvas.width - drawWidth) / 2;
+          } else {
+            drawWidth = canvas.width;
+            drawHeight = drawWidth / videoRatio;
+            dy = (canvas.height - drawHeight) / 2;
+          }
+          ctx.fillStyle = "#111";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, dx, dy, drawWidth, drawHeight);
+          frames.push(canvas.toDataURL("image/jpeg", 0.72));
+        }
+        URL.revokeObjectURL(url);
+        resolve(frames);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error);
+      }
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("影片讀取失敗，請確認檔案格式。"));
+    };
+  });
+}
+
+function seekVideo(video, time) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("影片抽幀逾時。")), 8000);
+    video.onseeked = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    video.currentTime = time;
+  });
 }
 
 function analyzeCompetitorVideo() {

@@ -21,9 +21,27 @@
 SUPABASE_URL=你的 Supabase Project URL
 SUPABASE_SERVICE_ROLE_KEY=你的 Supabase service_role key
 APP_SYNC_TOKEN=自己設定一組長密碼
+OPENAI_API_KEY=你的 OpenAI API key
 ```
 
 `APP_SYNC_TOKEN` 是你在手機和電腦同步時要輸入的同步金鑰，建議至少 20 個字元。
+
+`OPENAI_API_KEY` 用於「競品分析 → 自動分析上傳影片」。如果沒有設定，其他功能仍可使用，但影片自動轉逐字稿與 AI 分鏡分析不能使用。
+
+## 2-1. 建立 OpenAI API Key
+
+1. 到 OpenAI Platform 建立 API key。
+2. 把 key 貼到 Vercel 的 Environment Variables：
+
+```text
+OPENAI_API_KEY=你的 OpenAI API key
+```
+
+注意：
+
+- 不要把 API key 貼到 GitHub。
+- OpenAI 影片分析會產生成本。
+- 目前上傳影片建議小於 25MB，太大的影片請先裁短或壓縮。
 
 ## 3. 第一次同步
 
@@ -52,3 +70,19 @@ MVP 採用手動同步：
 - 手機改完資料後，也可以點「上傳到雲端」。
 
 這樣比自動同步更不容易覆蓋掉你正在編輯的內容。未來可以再升級成自動同步、登入帳號、多工作區或多人協作。
+
+## 6. 競品影片自動分析
+
+部署並設定 `OPENAI_API_KEY` 後，到：
+
+```text
+競品分析 → 上傳影片檔 → 自動分析上傳影片
+```
+
+系統會：
+
+```text
+影片上傳 → 自動轉逐字稿 → 抽取關鍵畫面 → AI 分析分鏡 → 改寫成可樂吉版本
+```
+
+如果只貼 IG Reels 連結，因為 IG 權限限制，系統不一定能直接讀取影片內容。最穩定的方式仍是上傳影片檔。
