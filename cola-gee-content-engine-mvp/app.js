@@ -835,18 +835,66 @@ async function autoAnalyzeUploadedVideo() {
 }
 
 async function uploadCompetitorVideoToBlob(file, onProgress) {
-  const { upload } = await import("https://esm.sh/@vercel/blob@latest/client?bundle");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
-  const blob = await upload(safeName, file, {
-    access: "public",
-    handleUploadUrl: "/api/upload-video",
-    onUploadProgress(event) {
-      if (typeof onProgress === "function") {
-        onProgress(event.percentage || 0);
+  const tokenResponse = await fetch("/api/upload-video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "blob.generate-client-token",
+      payload: {
+        pathname: safeName,
+        callbackUrl: `${window.location.origin}/api/upload-video`,
+        clientPayload: null,
+        multipart: false
       }
-    }
+    })
   });
-  return blob.url;
+  const tokenData = await tokenResponse.json().catch(() => ({}));
+  if (!tokenResponse.ok || !tokenData.clientToken) {
+    throw new Error(tokenData.error || "無法取得 Vercel Blob 上傳授權。");
+  }
+
+  return uploadFileWithClientToken({
+    file,
+    pathname: safeName,
+    clientToken: tokenData.clientToken,
+    onProgress
+  });
+}
+
+function uploadFileWithClientToken({ file, pathname, clientToken, onProgress }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const requestId = `cola-gee:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+    xhr.open("PUT", `https://blob.vercel-storage.com/${pathname}`);
+    xhr.setRequestHeader("authorization", `Bearer ${clientToken}`);
+    xhr.setRequestHeader("x-api-version", "7");
+    xhr.setRequestHeader("x-api-blob-request-id", requestId);
+    xhr.setRequestHeader("x-api-blob-request-attempt", "0");
+    if (file.type) xhr.setRequestHeader("x-content-type", file.type);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && typeof onProgress === "function") {
+        onProgress((event.loaded / event.total) * 100);
+      }
+    };
+    xhr.onload = () => {
+      let data = {};
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch (error) {
+        data = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+        if (typeof onProgress === "function") onProgress(100);
+        resolve(data.url);
+        return;
+      }
+      reject(new Error(data.error?.message || data.error || `Vercel Blob 上傳失敗：HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("Vercel Blob 上傳連線失敗，請確認網路後再試一次。"));
+    xhr.onabort = () => reject(new Error("Vercel Blob 上傳已取消。"));
+    xhr.send(file);
+  });
 }
 
 function fileToDataUrl(file) {
