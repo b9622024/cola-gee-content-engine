@@ -536,6 +536,7 @@ function renderResearch() {
         ${textareaField("compWhy", "你覺得它紅的原因", "例如：痛點很準、留言門檻低、Hook 很像我的日常。", "span-12")}
         <div class="field span-12">
           <div class="actions">
+            <button class="btn secondary" onclick="checkVideoAiApi()">檢查 AI 連線</button>
             <button class="btn warn" onclick="autoAnalyzeUploadedVideo()">自動分析上傳影片</button>
             <button class="btn" onclick="analyzeCompetitorVideo()">分析並改寫</button>
             <button class="btn secondary" onclick="copyCurrentCompetitorAnalysis()">複製分析結果</button>
@@ -648,6 +649,41 @@ function handleCompetitorVideoUpload(input) {
   `;
 }
 
+async function checkVideoAiApi() {
+  const output = document.getElementById("competitorAnalysisOutput");
+  if (output) output.textContent = "正在檢查 AI 影片分析 API...";
+  try {
+    const response = await fetch("/api/analyze-video");
+    const rawText = await response.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}：${data.error || rawText.slice(0, 200) || "檢查失敗"}`);
+    if (output) {
+      output.textContent = `AI 影片分析 API 檢查結果：
+
+API 部署：${data.ok ? "正常" : "異常"}
+OPENAI_API_KEY：${data.openai_key_configured ? "已設定" : "未設定"}
+訊息：${data.message || "無"}
+
+如果 OPENAI_API_KEY 顯示未設定，請到 Vercel → Settings → Environment Variables 新增 OPENAI_API_KEY，然後 Redeploy。`;
+    }
+  } catch (error) {
+    if (output) {
+      output.textContent = `AI 影片分析 API 檢查失敗：${error.message}
+
+常見原因：
+1. api/analyze-video.js 沒有成功部署
+2. vercel.json routes 設定還不是最新版
+3. Vercel 部署還在使用舊版本
+4. 瀏覽器快取載入舊 app.js`;
+    }
+  }
+}
+
 async function autoAnalyzeUploadedVideo() {
   const file = document.getElementById("compVideoFile")?.files?.[0];
   const output = document.getElementById("competitorAnalysisOutput");
@@ -655,15 +691,15 @@ async function autoAnalyzeUploadedVideo() {
     if (output) output.textContent = "請先選擇影片檔，再按「自動分析上傳影片」。";
     return;
   }
-  if (file.size > 25 * 1024 * 1024) {
-    if (output) output.textContent = "影片超過 25MB。請先裁短或壓縮後再上傳。";
+  if (file.size > 4 * 1024 * 1024) {
+    if (output) output.textContent = "影片檔目前建議小於 4MB。Vercel 會限制瀏覽器送到 API 的資料大小，請先用 10 到 20 秒短片或壓縮後再測試。";
     return;
   }
   if (output) output.textContent = "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
   try {
     const [videoDataUrl, frames] = await Promise.all([
       fileToDataUrl(file),
-      extractVideoFrames(file, 6)
+      extractVideoFrames(file, 3)
     ]);
     const response = await fetch("/api/analyze-video", {
       method: "POST",
@@ -681,8 +717,17 @@ async function autoAnalyzeUploadedVideo() {
         hook: val("compHook")
       })
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || "自動影片分析失敗。");
+    const rawText = await response.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) {
+      const detail = data.error || rawText.slice(0, 240) || "沒有回傳錯誤內容";
+      throw new Error(`HTTP ${response.status}：${detail}`);
+    }
     if (document.getElementById("compTranscript")) {
       document.getElementById("compTranscript").value = data.transcript || "";
     }
@@ -709,7 +754,14 @@ async function autoAnalyzeUploadedVideo() {
     });
     save();
   } catch (error) {
-    if (output) output.textContent = `自動分析失敗：${error.message}`;
+    if (output) output.textContent = `自動分析失敗：${error.message}
+
+你可以先檢查：
+1. Vercel 是否已上傳 api/analyze-video.js 並重新部署
+2. Vercel 是否有設定 OPENAI_API_KEY，而且有重新部署
+3. 影片是否小於 4MB，格式建議 mp4、m4a、wav 或 webm
+4. OpenAI 帳號是否有可用額度或付款方式
+5. 如果只看到 404，代表 API 檔案沒有部署成功`;
   }
 }
 
