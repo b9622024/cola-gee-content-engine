@@ -1755,7 +1755,7 @@ function isAbsoluteUrl(url) {
   }
 }
 export {
-  upload
+  put
 };
 /*! Bundled license information:
 

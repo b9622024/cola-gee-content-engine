@@ -850,10 +850,10 @@ async function autoAnalyzeUploadedVideo() {
 
 async function uploadCompetitorVideoToBlob(file, onProgress) {
   setVideoAnalysisProgress("載入上傳模組", 16, "正在載入站內 Blob 上傳工具。");
-  const { upload } = await import("/vendor/vercel-blob-client.js");
+  const { put } = await import("/vendor/vercel-blob-client.js");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
   setVideoAnalysisProgress("檢查上傳授權", 17, "正在確認 Vercel Blob 授權 API 是否正常回應。");
-  await preflightBlobUploadToken(safeName);
+  const clientToken = await preflightBlobUploadToken(safeName);
   setVideoAnalysisProgress("開始上傳 Blob", 20, "Blob 授權正常，正在開始上傳影片。");
   let progressStarted = false;
   let stallTimer;
@@ -864,9 +864,9 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
       }
     }, 45000);
   });
-  const uploadPromise = upload(safeName, file, {
+  const uploadPromise = put(safeName, file, {
       access: "public",
-      handleUploadUrl: "/api/upload-video",
+      token: clientToken,
       contentType: file.type || "video/mp4",
       onUploadProgress(event) {
         progressStarted = true;
