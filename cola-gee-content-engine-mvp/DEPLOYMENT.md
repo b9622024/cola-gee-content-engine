@@ -22,11 +22,14 @@ SUPABASE_URL=你的 Supabase Project URL
 SUPABASE_SERVICE_ROLE_KEY=你的 Supabase service_role key
 APP_SYNC_TOKEN=自己設定一組長密碼
 OPENAI_API_KEY=你的 OpenAI API key
+BLOB_READ_WRITE_TOKEN=Vercel Blob 自動產生的 token
 ```
 
 `APP_SYNC_TOKEN` 是你在手機和電腦同步時要輸入的同步金鑰，建議至少 20 個字元。
 
 `OPENAI_API_KEY` 用於「競品分析 → 自動分析上傳影片」。如果沒有設定，其他功能仍可使用，但影片自動轉逐字稿與 AI 分鏡分析不能使用。
+
+`BLOB_READ_WRITE_TOKEN` 用於上傳 4MB 以上的競品影片。建立 Vercel Blob Storage 並連到這個專案後，Vercel 通常會自動加入這個環境變數。
 
 ## 2-1. 建立 OpenAI API Key
 
@@ -41,7 +44,21 @@ OPENAI_API_KEY=你的 OpenAI API key
 
 - 不要把 API key 貼到 GitHub。
 - OpenAI 影片分析會產生成本。
-- 目前上傳影片建議小於 25MB，太大的影片請先裁短或壓縮。
+- 目前上傳影片建議小於 20MB，太大的影片請先裁短或壓縮。
+
+## 2-2. 建立 Vercel Blob Storage
+
+如果你要分析 4MB 以上的影片，請在 Vercel 建立 Blob：
+
+1. 到 Vercel 專案頁面。
+2. 左側點 Storage。
+3. 點 Create Database。
+4. 選 Blob。
+5. 建立後確認它有連到 `cola-gee-content-engine` 這個專案。
+6. 回到 Settings → Environment Variables，確認有 `BLOB_READ_WRITE_TOKEN`。
+7. 重新 Redeploy。
+
+完成後，競品分析可以上傳約 20MB 以下的影片。
 
 ## 3. 第一次同步
 
@@ -73,7 +90,7 @@ MVP 採用手動同步：
 
 ## 6. 競品影片自動分析
 
-部署並設定 `OPENAI_API_KEY` 後，到：
+部署並設定 `OPENAI_API_KEY` 與 `BLOB_READ_WRITE_TOKEN` 後，到：
 
 ```text
 競品分析 → 上傳影片檔 → 自動分析上傳影片
@@ -85,4 +102,4 @@ MVP 採用手動同步：
 影片上傳 → 自動轉逐字稿 → 抽取關鍵畫面 → AI 分析分鏡 → 改寫成可樂吉版本
 ```
 
-如果只貼 IG Reels 連結，因為 IG 權限限制，系統不一定能直接讀取影片內容。最穩定的方式仍是上傳影片檔。
+如果只貼 IG Reels 連結，因為 IG 權限限制，系統不一定能直接讀取影片內容。最穩定的方式仍是上傳影片檔。4MB 以下影片會直接分析；4MB 到 20MB 的影片會先上傳到 Vercel Blob 再分析。

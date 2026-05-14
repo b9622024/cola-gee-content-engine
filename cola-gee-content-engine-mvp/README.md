@@ -64,7 +64,8 @@ DEPLOYMENT.md
 
 - Vercel serverless API：`api/state.js`
 - OpenAI 影片分析 API：`api/analyze-video.js`
+- Vercel Blob 大檔案上傳 API：`api/upload-video.js`
 - Supabase 資料表：`supabase.sql`
 - 前端「設定 → 雲端同步」
 - 手機與電腦可用同一組工作區 ID 和同步金鑰同步資料
-- 競品影片自動分析：上傳影片後自動轉逐字稿、分析分鏡、改寫腳本
+- 競品影片自動分析：上傳約 20MB 以下影片後自動轉逐字稿、分析分鏡、改寫腳本

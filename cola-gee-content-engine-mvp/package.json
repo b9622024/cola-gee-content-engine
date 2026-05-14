@@ -5,5 +5,8 @@
   "description": "可樂吉健康研究所減重教練自然流量內容引擎 MVP",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "latest"
   }
 }

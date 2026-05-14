@@ -640,10 +640,12 @@ function handleCompetitorVideoUpload(input) {
   const file = input.files?.[0];
   const target = document.getElementById("competitorVideoPreview");
   if (!file || !target) return;
+  const sizeMb = Math.round(file.size / 1024 / 1024 * 10) / 10;
+  const uploadMode = file.size > 4 * 1024 * 1024 ? "會使用 Vercel Blob 大檔案上傳" : "可直接分析，也可走 Blob 備援";
   const url = URL.createObjectURL(file);
   target.innerHTML = `
     <div class="notice">
-      已選擇影片：${escapeHtml(file.name)}｜${Math.round(file.size / 1024 / 1024 * 10) / 10} MB
+      已選擇影片：${escapeHtml(file.name)}｜${sizeMb} MB｜${uploadMode}
     </div>
     <video controls src="${url}"></video>
   `;
@@ -662,14 +664,17 @@ async function checkVideoAiApi() {
       data = {};
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}：${data.error || rawText.slice(0, 200) || "檢查失敗"}`);
+    const uploadCheck = await fetch("/api/upload-video").then((r) => r.json()).catch(() => null);
     if (output) {
       output.textContent = `AI 影片分析 API 檢查結果：
 
 API 部署：${data.ok ? "正常" : "異常"}
 OPENAI_API_KEY：${data.openai_key_configured ? "已設定" : "未設定"}
+BLOB_READ_WRITE_TOKEN：${data.blob_token_configured || uploadCheck?.blob_token_configured ? "已設定" : "未設定"}
 訊息：${data.message || "無"}
 
-如果 OPENAI_API_KEY 顯示未設定，請到 Vercel → Settings → Environment Variables 新增 OPENAI_API_KEY，然後 Redeploy。`;
+如果 OPENAI_API_KEY 顯示未設定，請到 Vercel → Settings → Environment Variables 新增 OPENAI_API_KEY，然後 Redeploy。
+如果 BLOB_READ_WRITE_TOKEN 顯示未設定，請到 Vercel → Storage 建立 Blob，並連到這個專案。`;
     }
   } catch (error) {
     if (output) {
@@ -691,22 +696,32 @@ async function autoAnalyzeUploadedVideo() {
     if (output) output.textContent = "請先選擇影片檔，再按「自動分析上傳影片」。";
     return;
   }
-  if (file.size > 4 * 1024 * 1024) {
-    if (output) output.textContent = "影片檔目前建議小於 4MB。Vercel 會限制瀏覽器送到 API 的資料大小，請先用 10 到 20 秒短片或壓縮後再測試。";
+  if (file.size > 20 * 1024 * 1024) {
+    if (output) output.textContent = "目前大檔案版本建議上傳 20MB 以下影片。再大的影片會接近 OpenAI 逐字稿限制，請先裁短或壓縮後再上傳。";
     return;
   }
-  if (output) output.textContent = "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
+  const useBlobUpload = file.size > 4 * 1024 * 1024;
+  if (output) {
+    output.textContent = useBlobUpload
+      ? "正在上傳影片到 Vercel Blob、抽取關鍵畫面並轉逐字稿，請稍候..."
+      : "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
+  }
   try {
-    const [videoDataUrl, frames] = await Promise.all([
-      fileToDataUrl(file),
-      extractVideoFrames(file, 3)
-    ]);
+    const framesPromise = extractVideoFrames(file, 3);
+    const videoPayloadPromise = useBlobUpload
+      ? uploadCompetitorVideoToBlob(file)
+      : fileToDataUrl(file);
+    const [videoPayload, frames] = await Promise.all([videoPayloadPromise, framesPromise]);
+    if (output && useBlobUpload) {
+      output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
+    }
     const response = await fetch("/api/analyze-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         file_name: file.name,
-        video_data_url: videoDataUrl,
+        video_data_url: useBlobUpload ? "" : videoPayload,
+        video_url: useBlobUpload ? videoPayload : "",
         frames,
         source_url: val("compUrl"),
         platform: val("compPlatform"),
@@ -758,11 +773,21 @@ async function autoAnalyzeUploadedVideo() {
 
 你可以先檢查：
 1. Vercel 是否已上傳 api/analyze-video.js 並重新部署
-2. Vercel 是否有設定 OPENAI_API_KEY，而且有重新部署
-3. 影片是否小於 4MB，格式建議 mp4、m4a、wav 或 webm
+2. Vercel 是否有設定 OPENAI_API_KEY 和 BLOB_READ_WRITE_TOKEN，而且有重新部署
+3. 影片是否小於 20MB，格式建議 mp4、mov 或 webm
 4. OpenAI 帳號是否有可用額度或付款方式
 5. 如果只看到 404，代表 API 檔案沒有部署成功`;
   }
+}
+
+async function uploadCompetitorVideoToBlob(file) {
+  const { upload } = await import("https://esm.sh/@vercel/blob@latest/client?bundle");
+  const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
+  const blob = await upload(safeName, file, {
+    access: "public",
+    handleUploadUrl: "/api/upload-video"
+  });
+  return blob.url;
 }
 
 function fileToDataUrl(file) {
