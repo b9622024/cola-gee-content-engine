@@ -855,16 +855,30 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
   setVideoAnalysisProgress("檢查上傳授權", 17, "正在確認 Vercel Blob 授權 API 是否正常回應。");
   await preflightBlobUploadToken(safeName);
   setVideoAnalysisProgress("開始上傳 Blob", 20, "Blob 授權正常，正在開始上傳影片。");
-  const blob = await withTimeout(
-    upload(safeName, file, {
+  let progressStarted = false;
+  let stallTimer;
+  const stallPromise = new Promise((_, reject) => {
+    stallTimer = setTimeout(() => {
+      if (!progressStarted) {
+        reject(new Error("Blob 已取得授權，但 45 秒內沒有開始傳輸影片。請確認 vendor/vercel-blob-client.js 已更新，或換一個網路環境再試。"));
+      }
+    }, 45000);
+  });
+  const uploadPromise = upload(safeName, file, {
       access: "public",
       handleUploadUrl: "/api/upload-video",
       contentType: file.type || "video/mp4",
       onUploadProgress(event) {
+        progressStarted = true;
+        if (stallTimer) clearTimeout(stallTimer);
         if (typeof onProgress === "function") {
           onProgress(event.percentage || 0);
         }
       }
+    });
+  const blob = await withTimeout(
+    Promise.race([uploadPromise, stallPromise]).finally(() => {
+      if (stallTimer) clearTimeout(stallTimer);
     }),
     900000,
     "影片上傳或取得 Blob 授權超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"

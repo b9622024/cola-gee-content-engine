@@ -7,6 +7,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "@vercel/blob": "0.23.4"
+    "@vercel/blob": "2.3.3"
   }
 }

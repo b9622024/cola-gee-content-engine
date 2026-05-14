@@ -24,9 +24,18 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../../../../../private/tmp/blobbuild/node_modules/retry/lib/retry_operation.js
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/is-buffer/index.js
+var require_is_buffer = __commonJS({
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/is-buffer/index.js"(exports, module) {
+    module.exports = function isBuffer2(obj) {
+      return obj != null && obj.constructor != null && typeof obj.constructor.isBuffer === "function" && obj.constructor.isBuffer(obj);
+    };
+  }
+});
+
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/retry/lib/retry_operation.js
 var require_retry_operation = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/retry/lib/retry_operation.js"(exports, module) {
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/retry/lib/retry_operation.js"(exports, module) {
     function RetryOperation(timeouts, options) {
       if (typeof options === "boolean") {
         options = { forever: options };
@@ -159,9 +168,9 @@ var require_retry_operation = __commonJS({
   }
 });
 
-// ../../../../../../private/tmp/blobbuild/node_modules/retry/lib/retry.js
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/retry/lib/retry.js
 var require_retry = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/retry/lib/retry.js"(exports) {
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/retry/lib/retry.js"(exports) {
     var RetryOperation = require_retry_operation();
     exports.operation = function(options) {
       var timeouts = exports.timeouts(options);
@@ -245,16 +254,16 @@ var require_retry = __commonJS({
   }
 });
 
-// ../../../../../../private/tmp/blobbuild/node_modules/retry/index.js
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/retry/index.js
 var require_retry2 = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/retry/index.js"(exports, module) {
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/retry/index.js"(exports, module) {
     module.exports = require_retry();
   }
 });
 
-// ../../../../../../private/tmp/blobbuild/node_modules/async-retry/lib/index.js
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/async-retry/lib/index.js
 var require_lib = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/async-retry/lib/index.js"(exports, module) {
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/async-retry/lib/index.js"(exports, module) {
     var retrier = require_retry2();
     function retry2(fn, opts) {
       function run(resolve, reject) {
@@ -298,129 +307,54 @@ var require_lib = __commonJS({
   }
 });
 
-// ../../../../../../private/tmp/blobbuild/node_modules/bytes/index.js
-var require_bytes = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/bytes/index.js"(exports, module) {
-    "use strict";
-    module.exports = bytes2;
-    module.exports.format = format;
-    module.exports.parse = parse;
-    var formatThousandsRegExp = /\B(?=(\d{3})+(?!\d))/g;
-    var formatDecimalsRegExp = /(?:\.0*|(\.[^0]+)0+)$/;
-    var map = {
-      b: 1,
-      kb: 1 << 10,
-      mb: 1 << 20,
-      gb: 1 << 30,
-      tb: Math.pow(1024, 4),
-      pb: Math.pow(1024, 5)
-    };
-    var parseRegExp = /^((-|\+)?(\d+(?:\.\d+)?)) *(kb|mb|gb|tb|pb)$/i;
-    function bytes2(value, options) {
-      if (typeof value === "string") {
-        return parse(value);
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/throttleit/index.js
+var require_throttleit = __commonJS({
+  "../../../../../../private/tmp/blobbuild-latest/node_modules/throttleit/index.js"(exports, module) {
+    function throttle3(function_, wait) {
+      if (typeof function_ !== "function") {
+        throw new TypeError(`Expected the first argument to be a \`function\`, got \`${typeof function_}\`.`);
       }
-      if (typeof value === "number") {
-        return format(value, options);
-      }
-      return null;
-    }
-    function format(value, options) {
-      if (!Number.isFinite(value)) {
-        return null;
-      }
-      var mag = Math.abs(value);
-      var thousandsSeparator = options && options.thousandsSeparator || "";
-      var unitSeparator = options && options.unitSeparator || "";
-      var decimalPlaces = options && options.decimalPlaces !== void 0 ? options.decimalPlaces : 2;
-      var fixedDecimals = Boolean(options && options.fixedDecimals);
-      var unit = options && options.unit || "";
-      if (!unit || !map[unit.toLowerCase()]) {
-        if (mag >= map.pb) {
-          unit = "PB";
-        } else if (mag >= map.tb) {
-          unit = "TB";
-        } else if (mag >= map.gb) {
-          unit = "GB";
-        } else if (mag >= map.mb) {
-          unit = "MB";
-        } else if (mag >= map.kb) {
-          unit = "KB";
+      let timeoutId;
+      let lastCallTime = 0;
+      return function throttled(...arguments_) {
+        clearTimeout(timeoutId);
+        const now = Date.now();
+        const timeSinceLastCall = now - lastCallTime;
+        const delayForNextCall = wait - timeSinceLastCall;
+        if (delayForNextCall <= 0) {
+          lastCallTime = now;
+          function_.apply(this, arguments_);
         } else {
-          unit = "B";
+          timeoutId = setTimeout(() => {
+            lastCallTime = Date.now();
+            function_.apply(this, arguments_);
+          }, delayForNextCall);
         }
-      }
-      var val = value / map[unit.toLowerCase()];
-      var str = val.toFixed(decimalPlaces);
-      if (!fixedDecimals) {
-        str = str.replace(formatDecimalsRegExp, "$1");
-      }
-      if (thousandsSeparator) {
-        str = str.split(".").map(function(s, i) {
-          return i === 0 ? s.replace(formatThousandsRegExp, thousandsSeparator) : s;
-        }).join(".");
-      }
-      return str + unitSeparator + unit;
+      };
     }
-    function parse(val) {
-      if (typeof val === "number" && !isNaN(val)) {
-        return val;
-      }
-      if (typeof val !== "string") {
-        return null;
-      }
-      var results = parseRegExp.exec(val);
-      var floatValue;
-      var unit = "b";
-      if (!results) {
-        floatValue = parseInt(val, 10);
-        unit = "b";
-      } else {
-        floatValue = parseFloat(results[1]);
-        unit = results[4].toLowerCase();
-      }
-      if (isNaN(floatValue)) {
-        return null;
-      }
-      return Math.floor(map[unit] * floatValue);
-    }
+    module.exports = throttle3;
   }
 });
 
-// ../../../../../../private/tmp/blobbuild/node_modules/is-buffer/index.js
-var require_is_buffer = __commonJS({
-  "../../../../../../private/tmp/blobbuild/node_modules/is-buffer/index.js"(exports, module) {
-    module.exports = function isBuffer2(obj) {
-      return obj != null && obj.constructor != null && typeof obj.constructor.isBuffer === "function" && obj.constructor.isBuffer(obj);
-    };
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/is-node-process/lib/index.mjs
+function isNodeProcess() {
+  if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+    return true;
   }
-});
-
-// ../../../../../../private/tmp/blobbuild/node_modules/@vercel/blob/dist/undici-browser.js
-var fetch = globalThis.fetch.bind(globalThis);
-
-// ../../../../../../private/tmp/blobbuild/node_modules/@vercel/blob/dist/chunk-QRRHJ574.js
-var import_async_retry = __toESM(require_lib(), 1);
-var import_bytes = __toESM(require_bytes(), 1);
-
-// ../../../../../../private/tmp/blobbuild/node_modules/is-plain-object/dist/is-plain-object.mjs
-function isObject(o) {
-  return Object.prototype.toString.call(o) === "[object Object]";
-}
-function isPlainObject(o) {
-  var ctor, prot;
-  if (isObject(o) === false) return false;
-  ctor = o.constructor;
-  if (ctor === void 0) return true;
-  prot = ctor.prototype;
-  if (isObject(prot) === false) return false;
-  if (prot.hasOwnProperty("isPrototypeOf") === false) {
-    return false;
+  if (typeof process !== "undefined") {
+    const type = process.type;
+    if (type === "renderer" || type === "worker") {
+      return false;
+    }
+    return !!(process.versions && process.versions.node);
   }
-  return true;
+  return false;
 }
 
-// ../../../../../../private/tmp/blobbuild/node_modules/@vercel/blob/dist/stream-browser.js
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/chunk-WLMB4XQD.js
+var import_is_buffer = __toESM(require_is_buffer(), 1);
+
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/stream-browser.js
 var Readable = {
   toWeb() {
     throw new Error(
@@ -429,8 +363,104 @@ var Readable = {
   }
 };
 
-// ../../../../../../private/tmp/blobbuild/node_modules/@vercel/blob/dist/chunk-QRRHJ574.js
-var import_is_buffer = __toESM(require_is_buffer(), 1);
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/chunk-WLMB4XQD.js
+var import_async_retry = __toESM(require_lib(), 1);
+
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/undici-browser.js
+var fetch = globalThis.fetch.bind(globalThis);
+
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/chunk-WLMB4XQD.js
+var import_throttleit = __toESM(require_throttleit(), 1);
+var import_throttleit2 = __toESM(require_throttleit(), 1);
+var supportsNewBlobFromArrayBuffer = new Promise((resolve) => {
+  try {
+    const helloAsArrayBuffer = new Uint8Array([104, 101, 108, 108, 111]);
+    const blob = new Blob([helloAsArrayBuffer]);
+    blob.text().then((text) => {
+      resolve(text === "hello");
+    }).catch(() => {
+      resolve(false);
+    });
+  } catch {
+    resolve(false);
+  }
+});
+async function toReadableStream(value) {
+  if (value instanceof ReadableStream) {
+    return value;
+  }
+  if (value instanceof Blob) {
+    return value.stream();
+  }
+  if (isNodeJsReadableStream(value)) {
+    return Readable.toWeb(value);
+  }
+  let streamValue;
+  if (value instanceof ArrayBuffer) {
+    streamValue = new Uint8Array(value);
+  } else if (isNodeJsBuffer(value)) {
+    streamValue = value;
+  } else {
+    streamValue = stringToUint8Array(value);
+  }
+  if (await supportsNewBlobFromArrayBuffer) {
+    return new Blob([streamValue]).stream();
+  }
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(streamValue);
+      controller.close();
+    }
+  });
+}
+function isNodeJsReadableStream(value) {
+  return typeof value === "object" && typeof value.pipe === "function" && value.readable && typeof value._read === "function" && // @ts-expect-error _readableState does exists on Readable
+  typeof value._readableState === "object";
+}
+function stringToUint8Array(s) {
+  const enc = new TextEncoder();
+  return enc.encode(s);
+}
+function isNodeJsBuffer(value) {
+  return (0, import_is_buffer.default)(value);
+}
+var parseRegExp = /^((-|\+)?(\d+(?:\.\d+)?)) *(kb|mb|gb|tb|pb)$/i;
+var map = {
+  b: 1,
+  kb: 1 << 10,
+  mb: 1 << 20,
+  gb: 1 << 30,
+  tb: 1024 ** 4,
+  pb: 1024 ** 5
+};
+function bytes(val) {
+  if (typeof val === "number" && !Number.isNaN(val)) {
+    return val;
+  }
+  if (typeof val !== "string") {
+    return null;
+  }
+  const results = parseRegExp.exec(val);
+  let floatValue;
+  let unit = "b";
+  if (!results) {
+    floatValue = parseInt(val, 10);
+  } else {
+    const [, res, , , unitMatch] = results;
+    if (!res) {
+      return null;
+    }
+    floatValue = parseFloat(res);
+    if (unitMatch) {
+      unit = unitMatch.toLowerCase();
+    }
+  }
+  if (Number.isNaN(floatValue)) {
+    return null;
+  }
+  return Math.floor(map[unit] * floatValue);
+}
+var defaultVercelBlobApiUrl = "https://vercel.com/api/blob";
 function getTokenFromOptionsOrEnv(options) {
   if (options == null ? void 0 : options.token) {
     return options.token;
@@ -447,6 +477,97 @@ var BlobError = class extends Error {
     super(`Vercel Blob: ${message}`);
   }
 };
+function isPlainObject(value) {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return (prototype === null || prototype === Object.prototype || Object.getPrototypeOf(prototype) === null) && !(Symbol.toStringTag in value) && !(Symbol.iterator in value);
+}
+var disallowedPathnameCharacters = ["//"];
+var supportsRequestStreams = (() => {
+  if (isNodeProcess()) {
+    return true;
+  }
+  const apiUrl = getApiUrl();
+  if (apiUrl.startsWith("http://localhost")) {
+    return false;
+  }
+  let duplexAccessed = false;
+  const hasContentType = new Request(getApiUrl(), {
+    body: new ReadableStream(),
+    method: "POST",
+    // @ts-expect-error -- TypeScript doesn't yet have duplex but it's in the spec: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1729
+    get duplex() {
+      duplexAccessed = true;
+      return "half";
+    }
+  }).headers.has("Content-Type");
+  return duplexAccessed && !hasContentType;
+})();
+function getApiUrl(pathname = "") {
+  let baseUrl = null;
+  try {
+    baseUrl = process.env.VERCEL_BLOB_API_URL || process.env.NEXT_PUBLIC_VERCEL_BLOB_API_URL;
+  } catch {
+  }
+  return `${baseUrl || defaultVercelBlobApiUrl}${pathname}`;
+}
+var TEXT_ENCODER = typeof TextEncoder === "function" ? new TextEncoder() : null;
+function computeBodyLength(body) {
+  if (!body) {
+    return 0;
+  }
+  if (typeof body === "string") {
+    if (TEXT_ENCODER) {
+      return TEXT_ENCODER.encode(body).byteLength;
+    }
+    return new Blob([body]).size;
+  }
+  if ("byteLength" in body && typeof body.byteLength === "number") {
+    return body.byteLength;
+  }
+  if ("size" in body && typeof body.size === "number") {
+    return body.size;
+  }
+  return 0;
+}
+var createChunkTransformStream = (chunkSize, onProgress) => {
+  let buffer = new Uint8Array(0);
+  return new TransformStream({
+    transform(chunk, controller) {
+      const newBuffer = new Uint8Array(buffer.length + chunk.byteLength);
+      newBuffer.set(buffer);
+      newBuffer.set(new Uint8Array(chunk), buffer.length);
+      buffer = newBuffer;
+      while (buffer.length >= chunkSize) {
+        const newChunk = buffer.slice(0, chunkSize);
+        controller.enqueue(newChunk);
+        onProgress == null ? void 0 : onProgress(newChunk.byteLength);
+        buffer = buffer.slice(chunkSize);
+      }
+    },
+    flush(controller) {
+      if (buffer.length > 0) {
+        controller.enqueue(buffer);
+        onProgress == null ? void 0 : onProgress(buffer.byteLength);
+      }
+    }
+  });
+};
+function isReadableStream(value) {
+  return globalThis.ReadableStream && // TODO: Can be removed once Node.js 16 is no more required internally
+  value instanceof ReadableStream;
+}
+function isStream(value) {
+  if (isReadableStream(value)) {
+    return true;
+  }
+  if (isNodeJsReadableStream(value)) {
+    return true;
+  }
+  return false;
+}
 var debugIsActive = false;
 var _a;
 var _b;
@@ -454,16 +575,208 @@ try {
   if (((_a = process.env.DEBUG) == null ? void 0 : _a.includes("blob")) || ((_b = process.env.NEXT_PUBLIC_DEBUG) == null ? void 0 : _b.includes("blob"))) {
     debugIsActive = true;
   }
-} catch (error) {
+} catch {
 }
 function debug(message, ...args) {
   if (debugIsActive) {
     console.debug(`vercel-blob: ${message}`, ...args);
   }
 }
+var _a2;
+var DOMException2 = (_a2 = globalThis.DOMException) != null ? _a2 : (() => {
+  try {
+    atob("~");
+  } catch (err) {
+    return Object.getPrototypeOf(err).constructor;
+  }
+})();
+var objectToString = Object.prototype.toString;
+var isError = (value) => objectToString.call(value) === "[object Error]";
+var errorMessages = /* @__PURE__ */ new Set([
+  "network error",
+  // Chrome
+  "Failed to fetch",
+  // Chrome
+  "NetworkError when attempting to fetch resource.",
+  // Firefox
+  "The Internet connection appears to be offline.",
+  // Safari 16
+  "Load failed",
+  // Safari 17+
+  "Network request failed",
+  // `cross-fetch`
+  "fetch failed",
+  // Undici (Node.js)
+  "terminated"
+  // Undici (Node.js)
+]);
+function isNetworkError(error) {
+  const isValid = error && isError(error) && error.name === "TypeError" && typeof error.message === "string";
+  if (!isValid) {
+    return false;
+  }
+  if (error.message === "Load failed") {
+    return error.stack === void 0;
+  }
+  return errorMessages.has(error.message);
+}
+var hasFetch = typeof fetch === "function";
+var hasFetchWithUploadProgress = hasFetch && supportsRequestStreams;
+var CHUNK_SIZE = 64 * 1024;
+var blobFetch = async ({
+  input,
+  init,
+  onUploadProgress
+}) => {
+  debug("using fetch");
+  let body;
+  if (init.body) {
+    if (onUploadProgress) {
+      const stream = await toReadableStream(init.body);
+      let loaded = 0;
+      const chunkTransformStream = createChunkTransformStream(
+        CHUNK_SIZE,
+        (newLoaded) => {
+          loaded += newLoaded;
+          onUploadProgress(loaded);
+        }
+      );
+      body = stream.pipeThrough(chunkTransformStream);
+    } else {
+      body = init.body;
+    }
+  }
+  const duplex = supportsRequestStreams && body && isStream(body) ? "half" : void 0;
+  return fetch(
+    input,
+    // @ts-expect-error -- Blob and Nodejs Blob are triggering type errors, fine with it
+    {
+      ...init,
+      ...init.body ? { body } : {},
+      duplex
+    }
+  );
+};
+var hasXhr = typeof XMLHttpRequest !== "undefined";
+var blobXhr = async ({
+  input,
+  init,
+  onUploadProgress
+}) => {
+  debug("using xhr");
+  let body = null;
+  if (init.body) {
+    if (isReadableStream(init.body)) {
+      body = await new Response(init.body).blob();
+    } else {
+      body = init.body;
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(init.method || "GET", input.toString(), true);
+    if (onUploadProgress) {
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          onUploadProgress(event.loaded);
+        }
+      });
+    }
+    xhr.onload = () => {
+      var _a3;
+      if ((_a3 = init.signal) == null ? void 0 : _a3.aborted) {
+        reject(new DOMException("The user aborted the request.", "AbortError"));
+        return;
+      }
+      const headers = new Headers();
+      const rawHeaders = xhr.getAllResponseHeaders().trim().split(/[\r\n]+/);
+      rawHeaders.forEach((line) => {
+        const parts = line.split(": ");
+        const key = parts.shift();
+        const value = parts.join(": ");
+        if (key) headers.set(key.toLowerCase(), value);
+      });
+      const response = new Response(xhr.response, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers
+      });
+      resolve(response);
+    };
+    xhr.onerror = () => {
+      reject(new TypeError("Network request failed"));
+    };
+    xhr.ontimeout = () => {
+      reject(new TypeError("Network request timed out"));
+    };
+    xhr.onabort = () => {
+      reject(new DOMException("The user aborted a request.", "AbortError"));
+    };
+    if (init.headers) {
+      const headers = new Headers(init.headers);
+      headers.forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+    }
+    if (init.signal) {
+      init.signal.addEventListener("abort", () => {
+        xhr.abort();
+      });
+      if (init.signal.aborted) {
+        xhr.abort();
+        return;
+      }
+    }
+    xhr.send(body);
+  });
+};
+var blobRequest = async ({
+  input,
+  init,
+  onUploadProgress
+}) => {
+  if (onUploadProgress) {
+    if (hasFetchWithUploadProgress) {
+      return blobFetch({ input, init, onUploadProgress });
+    }
+    if (hasXhr) {
+      return blobXhr({ input, init, onUploadProgress });
+    }
+  }
+  if (hasFetch) {
+    return blobFetch({ input, init });
+  }
+  if (hasXhr) {
+    return blobXhr({ input, init });
+  }
+  throw new Error("No request implementation available");
+};
+var MAXIMUM_PATHNAME_LENGTH = 950;
 var BlobAccessError = class extends BlobError {
   constructor() {
     super("Access denied, please provide a valid token for this resource.");
+  }
+};
+var BlobContentTypeNotAllowedError = class extends BlobError {
+  constructor(message) {
+    super(`Content type mismatch, ${message}.`);
+  }
+};
+var BlobPathnameMismatchError = class extends BlobError {
+  constructor(message) {
+    super(
+      `Pathname mismatch, ${message}. Check the pathname used in upload() or put() matches the one from the client token.`
+    );
+  }
+};
+var BlobClientTokenExpiredError = class extends BlobError {
+  constructor() {
+    super("Client token has expired.");
+  }
+};
+var BlobFileTooLargeError = class extends BlobError {
+  constructor(message) {
+    super(`File is too large, ${message}.`);
   }
 };
 var BlobStoreNotFoundError = class extends BlobError {
@@ -504,7 +817,12 @@ var BlobRequestAbortedError = class extends BlobError {
     super("The request was aborted.");
   }
 };
-var BLOB_API_VERSION = 7;
+var BlobPreconditionFailedError = class extends BlobError {
+  constructor() {
+    super("Precondition failed: ETag mismatch.");
+  }
+};
+var BLOB_API_VERSION = 12;
 function getApiVersion() {
   let versionOverride = null;
   try {
@@ -512,14 +830,6 @@ function getApiVersion() {
   } catch {
   }
   return `${versionOverride != null ? versionOverride : BLOB_API_VERSION}`;
-}
-function getApiUrl(pathname = "") {
-  let baseUrl = null;
-  try {
-    baseUrl = process.env.VERCEL_BLOB_API_URL || process.env.NEXT_PUBLIC_VERCEL_BLOB_API_URL;
-  } catch {
-  }
-  return `${baseUrl || "https://blob.vercel-storage.com"}${pathname}`;
 }
 function getRetries() {
   try {
@@ -536,15 +846,27 @@ function createBlobServiceRateLimited(response) {
   );
 }
 async function getBlobError(response) {
-  var _a2, _b2, _c;
+  var _a3, _b2, _c;
   let code;
   let message;
   try {
     const data = await response.json();
-    code = (_b2 = (_a2 = data.error) == null ? void 0 : _a2.code) != null ? _b2 : "unknown_error";
+    code = (_b2 = (_a3 = data.error) == null ? void 0 : _a3.code) != null ? _b2 : "unknown_error";
     message = (_c = data.error) == null ? void 0 : _c.message;
   } catch {
     code = "unknown_error";
+  }
+  if ((message == null ? void 0 : message.includes("contentType")) && message.includes("is not allowed")) {
+    code = "content_type_not_allowed";
+  }
+  if ((message == null ? void 0 : message.includes('"pathname"')) && message.includes("does not match the token payload")) {
+    code = "client_token_pathname_mismatch";
+  }
+  if (message === "Token expired") {
+    code = "client_token_expired";
+  }
+  if (message == null ? void 0 : message.includes("the file length cannot be greater than")) {
+    code = "file_too_large";
   }
   let error;
   switch (code) {
@@ -553,6 +875,18 @@ async function getBlobError(response) {
       break;
     case "forbidden":
       error = new BlobAccessError();
+      break;
+    case "content_type_not_allowed":
+      error = new BlobContentTypeNotAllowedError(message);
+      break;
+    case "client_token_pathname_mismatch":
+      error = new BlobPathnameMismatchError(message);
+      break;
+    case "client_token_expired":
+      error = new BlobClientTokenExpiredError();
+      break;
+    case "file_too_large":
+      error = new BlobFileTooLargeError(message);
       break;
     case "not_found":
       error = new BlobNotFoundError();
@@ -569,6 +903,9 @@ async function getBlobError(response) {
     case "rate_limited":
       error = createBlobServiceRateLimited(response);
       break;
+    case "precondition_failed":
+      error = new BlobPreconditionFailedError();
+      break;
     case "unknown_error":
     case "not_allowed":
     default:
@@ -584,24 +921,68 @@ async function requestApi(pathname, init, commandOptions) {
   const [, , , storeId = ""] = token.split("_");
   const requestId = `${storeId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
   let retryCount = 0;
+  let bodyLength = 0;
+  let totalLoaded = 0;
+  const sendBodyLength = (commandOptions == null ? void 0 : commandOptions.onUploadProgress) || shouldUseXContentLength();
+  if (init.body && // 1. For upload progress we always need to know the total size of the body
+  // 2. In development we need the header for put() to work correctly when passing a stream
+  sendBodyLength) {
+    bodyLength = computeBodyLength(init.body);
+  }
+  if (commandOptions == null ? void 0 : commandOptions.onUploadProgress) {
+    commandOptions.onUploadProgress({
+      loaded: 0,
+      total: bodyLength,
+      percentage: 0
+    });
+  }
   const apiResponse = await (0, import_async_retry.default)(
     async (bail) => {
       let res;
       try {
-        res = await fetch(getApiUrl(pathname), {
-          ...init,
-          headers: {
-            "x-api-blob-request-id": requestId,
-            "x-api-blob-request-attempt": String(retryCount),
-            "x-api-version": apiVersion,
-            authorization: `Bearer ${token}`,
-            ...extraHeaders,
-            ...init.headers
-          }
+        res = await blobRequest({
+          input: getApiUrl(pathname),
+          init: {
+            ...init,
+            headers: {
+              "x-api-blob-request-id": requestId,
+              "x-api-blob-request-attempt": String(retryCount),
+              "x-api-version": apiVersion,
+              ...sendBodyLength ? { "x-content-length": String(bodyLength) } : {},
+              authorization: `Bearer ${token}`,
+              ...extraHeaders,
+              ...init.headers
+            }
+          },
+          onUploadProgress: (commandOptions == null ? void 0 : commandOptions.onUploadProgress) ? (loaded) => {
+            var _a3;
+            const total = bodyLength !== 0 ? bodyLength : loaded;
+            totalLoaded = loaded;
+            const percentage = bodyLength > 0 ? Number((loaded / total * 100).toFixed(2)) : 0;
+            if (percentage === 100 && bodyLength > 0) {
+              return;
+            }
+            (_a3 = commandOptions.onUploadProgress) == null ? void 0 : _a3.call(commandOptions, {
+              loaded,
+              // When passing a stream to put(), we have no way to know the total size of the body.
+              // Instead of defining total as total?: number we decided to set the total to the currently
+              // loaded number. This is not inaccurate and way more practical for DX.
+              // Passing down a stream to put() is very rare
+              total,
+              percentage
+            });
+          } : void 0
         });
       } catch (error2) {
-        if (error2 instanceof DOMException && error2.name === "AbortError") {
+        if (error2 instanceof DOMException2 && error2.name === "AbortError") {
           bail(new BlobRequestAbortedError());
+          return;
+        }
+        if (isNetworkError(error2)) {
+          throw error2;
+        }
+        if (error2 instanceof TypeError) {
+          bail(error2);
           return;
         }
         throw error2;
@@ -618,7 +999,9 @@ async function requestApi(pathname, init, commandOptions) {
     {
       retries: getRetries(),
       onRetry: (error) => {
-        debug(`retrying API request to ${pathname}`, error.message);
+        if (error instanceof Error) {
+          debug(`retrying API request to ${pathname}`, error.message);
+        }
         retryCount = retryCount + 1;
       }
     }
@@ -626,34 +1009,64 @@ async function requestApi(pathname, init, commandOptions) {
   if (!apiResponse) {
     throw new BlobUnknownError();
   }
+  if (commandOptions == null ? void 0 : commandOptions.onUploadProgress) {
+    commandOptions.onUploadProgress({
+      loaded: totalLoaded,
+      total: totalLoaded,
+      percentage: 100
+    });
+  }
   return await apiResponse.json();
 }
 function getProxyThroughAlternativeApiHeaderFromEnv() {
   const extraHeaders = {};
   try {
-    if ("VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API" in process.env) {
-      extraHeaders["x-proxy-through-alternative-api"] = // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- we know it's here from the if
-      process.env.VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API;
-    } else if ("NEXT_PUBLIC_VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API" in process.env) {
-      extraHeaders["x-proxy-through-alternative-api"] = // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- we know it's here from the if
-      process.env.NEXT_PUBLIC_VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API;
+    if ("VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API" in process.env && process.env.VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API !== void 0) {
+      extraHeaders["x-proxy-through-alternative-api"] = process.env.VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API;
+    } else if ("NEXT_PUBLIC_VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API" in process.env && process.env.NEXT_PUBLIC_VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API !== void 0) {
+      extraHeaders["x-proxy-through-alternative-api"] = process.env.NEXT_PUBLIC_VERCEL_BLOB_PROXY_THROUGH_ALTERNATIVE_API;
     }
   } catch {
   }
   return extraHeaders;
 }
+function shouldUseXContentLength() {
+  try {
+    return process.env.VERCEL_BLOB_USE_X_CONTENT_LENGTH === "1";
+  } catch {
+    return false;
+  }
+}
 var putOptionHeaderMap = {
   cacheControlMaxAge: "x-cache-control-max-age",
   addRandomSuffix: "x-add-random-suffix",
-  contentType: "x-content-type"
+  allowOverwrite: "x-allow-overwrite",
+  contentType: "x-content-type",
+  access: "x-vercel-blob-access",
+  ifMatch: "x-if-match"
 };
 function createPutHeaders(allowedOptions, options) {
   const headers = {};
+  headers[putOptionHeaderMap.access] = options.access;
   if (allowedOptions.includes("contentType") && options.contentType) {
     headers[putOptionHeaderMap.contentType] = options.contentType;
   }
   if (allowedOptions.includes("addRandomSuffix") && options.addRandomSuffix !== void 0) {
     headers[putOptionHeaderMap.addRandomSuffix] = options.addRandomSuffix ? "1" : "0";
+  }
+  if (allowedOptions.includes("ifMatch") && options.ifMatch) {
+    if (options.allowOverwrite === false) {
+      throw new BlobError(
+        "ifMatch and allowOverwrite: false are contradictory. ifMatch is used for conditional overwrites, which requires allowOverwrite to be true."
+      );
+    }
+    headers[putOptionHeaderMap.ifMatch] = options.ifMatch;
+    if (allowedOptions.includes("allowOverwrite") && options.allowOverwrite === void 0) {
+      headers[putOptionHeaderMap.allowOverwrite] = "1";
+    }
+  }
+  if (allowedOptions.includes("allowOverwrite") && options.allowOverwrite !== void 0) {
+    headers[putOptionHeaderMap.allowOverwrite] = options.allowOverwrite ? "1" : "0";
   }
   if (allowedOptions.includes("cacheControlMaxAge") && options.cacheControlMaxAge !== void 0) {
     headers[putOptionHeaderMap.cacheControlMaxAge] = options.cacheControlMaxAge.toString();
@@ -669,11 +1082,25 @@ async function createPutOptions({
   if (!pathname) {
     throw new BlobError("pathname is required");
   }
+  if (pathname.length > MAXIMUM_PATHNAME_LENGTH) {
+    throw new BlobError(
+      `pathname is too long, maximum length is ${MAXIMUM_PATHNAME_LENGTH}`
+    );
+  }
+  for (const invalidCharacter of disallowedPathnameCharacters) {
+    if (pathname.includes(invalidCharacter)) {
+      throw new BlobError(
+        `pathname cannot contain "${invalidCharacter}", please encode it if needed`
+      );
+    }
+  }
   if (!options) {
     throw new BlobError("missing options, see usage");
   }
-  if (options.access !== "public") {
-    throw new BlobError('access must be "public"');
+  if (options.access !== "public" && options.access !== "private") {
+    throw new BlobError(
+      'access must be "private" or "public", see https://vercel.com/docs/vercel-blob'
+    );
   }
   if (extraChecks) {
     extraChecks(options);
@@ -710,9 +1137,10 @@ async function completeMultipartUpload({
   headers,
   options
 }) {
+  const params = new URLSearchParams({ pathname });
   try {
     const response = await requestApi(
-      `/mpu/${pathname}`,
+      `/mpu?${params.toString()}`,
       {
         method: "POST",
         headers: {
@@ -722,7 +1150,7 @@ async function completeMultipartUpload({
           "x-mpu-upload-id": uploadId,
           // key can be any utf8 character so we need to encode it as HTTP headers can only be us-ascii
           // https://www.rfc-editor.org/rfc/rfc7230#swection-3.2.4
-          "x-mpu-key": encodeURI(key)
+          "x-mpu-key": encodeURIComponent(key)
         },
         body: JSON.stringify(parts),
         signal: options.abortSignal
@@ -761,9 +1189,10 @@ function createCreateMultipartUploadMethod({ allowedOptions, getToken, extraChec
 }
 async function createMultipartUpload(pathname, headers, options) {
   debug("mpu: create", "pathname:", pathname);
+  const params = new URLSearchParams({ pathname });
   try {
     const response = await requestApi(
-      `/mpu/${pathname}`,
+      `/mpu?${params.toString()}`,
       {
         method: "POST",
         headers: {
@@ -779,9 +1208,8 @@ async function createMultipartUpload(pathname, headers, options) {
   } catch (error) {
     if (error instanceof TypeError && (error.message === "Failed to fetch" || error.message === "fetch failed")) {
       throw new BlobServiceNotAvailable();
-    } else {
-      throw error;
     }
+    throw error;
   }
 }
 function createUploadPartMethod({ allowedOptions, getToken, extraChecks }) {
@@ -821,32 +1249,29 @@ async function uploadPart({
   internalAbortController = new AbortController(),
   part
 }) {
-  var _a2, _b2, _c;
+  var _a3, _b2, _c;
+  const params = new URLSearchParams({ pathname });
   const responsePromise = requestApi(
-    `/mpu/${pathname}`,
+    `/mpu?${params.toString()}`,
     {
       signal: internalAbortController.signal,
       method: "POST",
       headers: {
         ...headers,
         "x-mpu-action": "upload",
-        "x-mpu-key": encodeURI(key),
+        "x-mpu-key": encodeURIComponent(key),
         "x-mpu-upload-id": uploadId,
         "x-mpu-part-number": part.partNumber.toString()
       },
       // weird things between undici types and native fetch types
-      body: part.blob,
-      // required in order to stream some body types to Cloudflare
-      // currently only supported in Node.js, we may have to feature detect this
-      // note: this doesn't send a content-length to the server
-      duplex: "half"
+      body: part.blob
     },
     options
   );
   function handleAbort() {
     internalAbortController.abort();
   }
-  if ((_a2 = options.abortSignal) == null ? void 0 : _a2.aborted) {
+  if ((_a3 = options.abortSignal) == null ? void 0 : _a3.aborted) {
     handleAbort();
   } else {
     (_b2 = options.abortSignal) == null ? void 0 : _b2.addEventListener("abort", handleAbort);
@@ -864,7 +1289,8 @@ function uploadAllParts({
   pathname,
   stream,
   headers,
-  options
+  options,
+  totalToLoad
 }) {
   debug("mpu: upload init", "key:", key);
   const internalAbortController = new AbortController();
@@ -881,6 +1307,22 @@ function uploadAllParts({
     let bytesSent = 0;
     let arrayBuffers = [];
     let currentPartBytesRead = 0;
+    let onUploadProgress;
+    const totalLoadedPerPartNumber = {};
+    if (options.onUploadProgress) {
+      onUploadProgress = (0, import_throttleit.default)(() => {
+        var _a3;
+        const loaded = Object.values(totalLoadedPerPartNumber).reduce(
+          (acc, cur) => {
+            return acc + cur;
+          },
+          0
+        );
+        const total = totalToLoad || loaded;
+        const percentage = totalToLoad > 0 ? Number(((loaded / totalToLoad || loaded) * 100).toFixed(2)) : 0;
+        (_a3 = options.onUploadProgress) == null ? void 0 : _a3.call(options, { loaded, total, percentage });
+      }, 150);
+    }
     read().catch(cancel);
     async function read() {
       debug(
@@ -888,9 +1330,9 @@ function uploadAllParts({
         "activeUploads:",
         activeUploads,
         "currentBytesInMemory:",
-        `${(0, import_bytes.default)(currentBytesInMemory)}/${(0, import_bytes.default)(maxBytesInMemory)}`,
+        `${bytes(currentBytesInMemory)}/${bytes(maxBytesInMemory)}`,
         "bytesSent:",
-        (0, import_bytes.default)(bytesSent)
+        bytes(bytesSent)
       );
       reading = true;
       while (currentBytesInMemory < maxBytesInMemory && !rejected) {
@@ -907,6 +1349,9 @@ function uploadAllParts({
                 })
               });
               sendParts();
+            } else if (activeUploads === 0) {
+              reader.releaseLock();
+              resolve(completedParts);
             }
             reading = false;
             return;
@@ -944,9 +1389,9 @@ function uploadAllParts({
         "activeUploads:",
         activeUploads,
         "currentBytesInMemory:",
-        `${(0, import_bytes.default)(currentBytesInMemory)}/${(0, import_bytes.default)(maxBytesInMemory)}`,
+        `${bytes(currentBytesInMemory)}/${bytes(maxBytesInMemory)}`,
         "bytesSent:",
-        (0, import_bytes.default)(bytesSent)
+        bytes(bytesSent)
       );
       reading = false;
     }
@@ -961,17 +1406,26 @@ function uploadAllParts({
         "activeUploads:",
         activeUploads,
         "currentBytesInMemory:",
-        `${(0, import_bytes.default)(currentBytesInMemory)}/${(0, import_bytes.default)(maxBytesInMemory)}`,
+        `${bytes(currentBytesInMemory)}/${bytes(maxBytesInMemory)}`,
         "bytesSent:",
-        (0, import_bytes.default)(bytesSent)
+        bytes(bytesSent)
       );
       try {
+        const uploadProgressForPart = options.onUploadProgress ? (event) => {
+          totalLoadedPerPartNumber[part.partNumber] = event.loaded;
+          if (onUploadProgress) {
+            onUploadProgress();
+          }
+        } : void 0;
         const completedPart = await uploadPart({
           uploadId,
           key,
           pathname,
           headers,
-          options,
+          options: {
+            ...options,
+            onUploadProgress: uploadProgressForPart
+          },
           internalAbortController,
           part
         });
@@ -982,9 +1436,9 @@ function uploadAllParts({
           "activeUploads",
           activeUploads,
           "currentBytesInMemory:",
-          `${(0, import_bytes.default)(currentBytesInMemory)}/${(0, import_bytes.default)(maxBytesInMemory)}`,
+          `${bytes(currentBytesInMemory)}/${bytes(maxBytesInMemory)}`,
           "bytesSent:",
-          (0, import_bytes.default)(bytesSent)
+          bytes(bytesSent)
         );
         if (rejected) {
           return;
@@ -1046,121 +1500,6 @@ function uploadAllParts({
     }
   });
 }
-function toReadableStream(value) {
-  if (value instanceof ReadableStream) {
-    return value;
-  }
-  if (value instanceof Blob) {
-    return value.stream();
-  }
-  if (isNodeJsReadableStream(value)) {
-    return Readable.toWeb(value);
-  }
-  let streamValue;
-  if (value instanceof ArrayBuffer) {
-    streamValue = value;
-  } else if (isNodeJsBufferOrString(value)) {
-    streamValue = value.buffer;
-  } else {
-    streamValue = stringToUint8Array(value);
-  }
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(streamValue);
-      controller.close();
-    }
-  });
-}
-function isNodeJsReadableStream(value) {
-  return typeof value === "object" && typeof value.pipe === "function" && value.readable && typeof value._read === "function" && // @ts-expect-error _readableState does exists on Readable
-  typeof value._readableState === "object";
-}
-function stringToUint8Array(s) {
-  const enc = new TextEncoder();
-  return enc.encode(s);
-}
-function isNodeJsBufferOrString(input) {
-  return (0, import_is_buffer.default)(input);
-}
-async function uncontrolledMultipartUpload(pathname, body, headers, options) {
-  debug("mpu: init", "pathname:", pathname, "headers:", headers);
-  const stream = toReadableStream(body);
-  const createMultipartUploadResponse = await createMultipartUpload(
-    pathname,
-    headers,
-    options
-  );
-  const parts = await uploadAllParts({
-    uploadId: createMultipartUploadResponse.uploadId,
-    key: createMultipartUploadResponse.key,
-    pathname,
-    stream,
-    headers,
-    options
-  });
-  const blob = await completeMultipartUpload({
-    uploadId: createMultipartUploadResponse.uploadId,
-    key: createMultipartUploadResponse.key,
-    pathname,
-    parts,
-    headers,
-    options
-  });
-  return blob;
-}
-function createPutMethod({
-  allowedOptions,
-  getToken,
-  extraChecks
-}) {
-  return async function put2(pathname, bodyOrOptions, optionsInput) {
-    const isFolderCreation = pathname.endsWith("/");
-    if (!bodyOrOptions && !isFolderCreation) {
-      throw new BlobError("body is required");
-    }
-    if (bodyOrOptions && optionsInput && isFolderCreation) {
-      throw new BlobError("body is not allowed for creating empty folders");
-    }
-    const body = isFolderCreation ? void 0 : bodyOrOptions;
-    if (body !== void 0 && isPlainObject(body)) {
-      throw new BlobError(
-        "Body must be a string, buffer or stream. You sent a plain JavaScript object, double check what you're trying to upload."
-      );
-    }
-    const options = await createPutOptions({
-      pathname,
-      // when no body is required (for folder creations) options are the second argument
-      options: isFolderCreation ? bodyOrOptions : optionsInput,
-      extraChecks,
-      getToken
-    });
-    const headers = createPutHeaders(allowedOptions, options);
-    if (options.multipart === true && body) {
-      return uncontrolledMultipartUpload(pathname, body, headers, options);
-    }
-    const response = await requestApi(
-      `/${pathname}`,
-      {
-        method: "PUT",
-        body,
-        headers,
-        // required in order to stream some body types to Cloudflare
-        // currently only supported in Node.js, we may have to feature detect this
-        // note: this doesn't send a content-length to the server
-        duplex: "half",
-        signal: options.abortSignal
-      },
-      options
-    );
-    return {
-      url: response.url,
-      downloadUrl: response.downloadUrl,
-      pathname: response.pathname,
-      contentType: response.contentType,
-      contentDisposition: response.contentDisposition
-    };
-  };
-}
 function createCreateMultipartUploaderMethod({ allowedOptions, getToken, extraChecks }) {
   return async (pathname, optionsInput) => {
     const options = await createPutOptions({
@@ -1210,25 +1549,108 @@ function createCreateMultipartUploaderMethod({ allowedOptions, getToken, extraCh
     };
   };
 }
-
-// ../../../../../../private/tmp/blobbuild/node_modules/@vercel/blob/dist/client.js
-function createPutExtraChecks(methodName) {
-  return function extraChecks(options) {
-    if (typeof window === "undefined") {
+async function uncontrolledMultipartUpload(pathname, body, headers, options) {
+  debug("mpu: init", "pathname:", pathname, "headers:", headers);
+  const optionsWithoutOnUploadProgress = {
+    ...options,
+    onUploadProgress: void 0
+  };
+  if (options.maximumSizeInBytes !== void 0 && !isStream(body) && computeBodyLength(body) > options.maximumSizeInBytes) {
+    throw new BlobError(
+      `Body size of ${computeBodyLength(body)} bytes exceeds the maximum allowed size of ${options.maximumSizeInBytes} bytes`
+    );
+  }
+  const createMultipartUploadResponse = await createMultipartUpload(
+    pathname,
+    headers,
+    optionsWithoutOnUploadProgress
+  );
+  const totalToLoad = computeBodyLength(body);
+  const stream = await toReadableStream(body);
+  const parts = await uploadAllParts({
+    uploadId: createMultipartUploadResponse.uploadId,
+    key: createMultipartUploadResponse.key,
+    pathname,
+    // @ts-expect-error ReadableStream<ArrayBuffer | Uint8Array> is compatible at runtime
+    stream,
+    headers,
+    options,
+    totalToLoad
+  });
+  const blob = await completeMultipartUpload({
+    uploadId: createMultipartUploadResponse.uploadId,
+    key: createMultipartUploadResponse.key,
+    pathname,
+    parts,
+    headers,
+    options: optionsWithoutOnUploadProgress
+  });
+  return blob;
+}
+function createPutMethod({
+  allowedOptions,
+  getToken,
+  extraChecks
+}) {
+  return async function put2(pathname, body, optionsInput) {
+    if (!body) {
+      throw new BlobError("body is required");
+    }
+    if (isPlainObject(body)) {
       throw new BlobError(
-        `${methodName} must be called from a client environment`
+        "Body must be a string, buffer or stream. You sent a plain JavaScript object, double check what you're trying to upload."
       );
     }
+    const options = await createPutOptions({
+      pathname,
+      options: optionsInput,
+      extraChecks,
+      getToken
+    });
+    const headers = createPutHeaders(allowedOptions, options);
+    if (options.multipart === true) {
+      return uncontrolledMultipartUpload(pathname, body, headers, options);
+    }
+    const onUploadProgress = options.onUploadProgress ? (0, import_throttleit2.default)(options.onUploadProgress, 100) : void 0;
+    const params = new URLSearchParams({ pathname });
+    const response = await requestApi(
+      `/?${params.toString()}`,
+      {
+        method: "PUT",
+        body,
+        headers,
+        signal: options.abortSignal
+      },
+      {
+        ...options,
+        onUploadProgress
+      }
+    );
+    return {
+      url: response.url,
+      downloadUrl: response.downloadUrl,
+      pathname: response.pathname,
+      contentType: response.contentType,
+      contentDisposition: response.contentDisposition,
+      etag: response.etag
+    };
+  };
+}
+
+// ../../../../../../private/tmp/blobbuild-latest/node_modules/@vercel/blob/dist/client.js
+function createPutExtraChecks(methodName) {
+  return function extraChecks(options) {
     if (!options.token.startsWith("vercel_blob_client_")) {
       throw new BlobError(`${methodName} must be called with a client token`);
     }
     if (
       // @ts-expect-error -- Runtime check for DX.
       options.addRandomSuffix !== void 0 || // @ts-expect-error -- Runtime check for DX.
+      options.allowOverwrite !== void 0 || // @ts-expect-error -- Runtime check for DX.
       options.cacheControlMaxAge !== void 0
     ) {
       throw new BlobError(
-        `${methodName} doesn't allow addRandomSuffix and cacheControlMaxAge. Configure these options at the server side when generating client tokens.`
+        `${methodName} doesn't allow \`addRandomSuffix\`, \`cacheControlMaxAge\` or \`allowOverwrite\`. Configure these options at the server side when generating client tokens.`
       );
     }
   };
@@ -1260,11 +1682,6 @@ var completeMultipartUpload2 = createCompleteMultipartUploadMethod(
 var upload = createPutMethod({
   allowedOptions: ["contentType"],
   extraChecks(options) {
-    if (typeof window === "undefined") {
-      throw new BlobError(
-        "client/`upload` must be called from a client environment"
-      );
-    }
     if (options.handleUploadUrl === void 0) {
       throw new BlobError(
         "client/`upload` requires the 'handleUploadUrl' parameter"
@@ -1273,20 +1690,23 @@ var upload = createPutMethod({
     if (
       // @ts-expect-error -- Runtime check for DX.
       options.addRandomSuffix !== void 0 || // @ts-expect-error -- Runtime check for DX.
-      options.cacheControlMaxAge !== void 0
+      options.createPutExtraChecks !== void 0 || // @ts-expect-error -- Runtime check for DX.
+      options.cacheControlMaxAge !== void 0 || // @ts-expect-error -- Runtime check for DX.
+      options.ifMatch !== void 0
     ) {
       throw new BlobError(
-        "client/`upload` doesn't allow addRandomSuffix and cacheControlMaxAge. Configure these options at the server side when generating client tokens."
+        "client/`upload` doesn't allow `addRandomSuffix`, `cacheControlMaxAge`, `allowOverwrite` or `ifMatch`. Configure these options at the server side when generating client tokens."
       );
     }
   },
   async getToken(pathname, options) {
-    var _a2, _b2;
+    var _a3, _b2;
     return retrieveClientToken({
       handleUploadUrl: options.handleUploadUrl,
       pathname,
-      clientPayload: (_a2 = options.clientPayload) != null ? _a2 : null,
-      multipart: (_b2 = options.multipart) != null ? _b2 : false
+      clientPayload: (_a3 = options.clientPayload) != null ? _a3 : null,
+      multipart: (_b2 = options.multipart) != null ? _b2 : false,
+      headers: options.headers
     });
   }
 });
@@ -1301,7 +1721,6 @@ async function retrieveClientToken(options) {
     type: EventTypes.generateClientToken,
     payload: {
       pathname,
-      callbackUrl: url,
       clientPayload: options.clientPayload,
       multipart: options.multipart
     }
@@ -1310,7 +1729,8 @@ async function retrieveClientToken(options) {
     method: "POST",
     body: JSON.stringify(event),
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...options.headers
     },
     signal: options.abortSignal
   });
@@ -1320,17 +1740,17 @@ async function retrieveClientToken(options) {
   try {
     const { clientToken } = await res.json();
     return clientToken;
-  } catch (e) {
+  } catch {
     throw new BlobError("Failed to retrieve the client token");
   }
 }
 function toAbsoluteUrl(url) {
-  return new URL(url, window.location.href).href;
+  return new URL(url, location.href).href;
 }
 function isAbsoluteUrl(url) {
   try {
     return Boolean(new URL(url));
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -1338,14 +1758,6 @@ export {
   upload
 };
 /*! Bundled license information:
-
-bytes/index.js:
-  (*!
-   * bytes
-   * Copyright(c) 2012-2014 TJ Holowaychuk
-   * Copyright(c) 2015 Jed Watson
-   * MIT Licensed
-   *)
 
 is-buffer/index.js:
   (*!
@@ -1355,11 +1767,11 @@ is-buffer/index.js:
    * @license  MIT
    *)
 
-is-plain-object/dist/is-plain-object.mjs:
+@vercel/blob/dist/chunk-WLMB4XQD.js:
   (*!
-   * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
-   *
-   * Copyright (c) 2014-2017, Jon Schlinkert.
-   * Released under the MIT License.
+   * bytes
+   * Copyright(c) 2012-2014 TJ Holowaychuk
+   * Copyright(c) 2015 Jed Watson
+   * MIT Licensed
    *)
 */
