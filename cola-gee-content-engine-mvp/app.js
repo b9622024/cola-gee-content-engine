@@ -212,7 +212,8 @@ function loadState() {
     social_copy: sampleIdeas.map((idea) => makeSocialCopy(idea.topic, idea.audience, idea.content_goal, idea.cta, idea.id)),
     performance_metrics: sampleMetrics,
     script_formulas: structuredClone(defaults.scriptFormulas),
-    market_research: structuredClone(defaults.marketResearch)
+    market_research: structuredClone(defaults.marketResearch),
+    competitor_analyses: []
   };
   localStorage.setItem(STORE_KEY, JSON.stringify(initial));
   return initial;
@@ -228,6 +229,7 @@ function normalizeState(saved) {
   };
   saved.script_formulas = saved.script_formulas?.length ? saved.script_formulas : structuredClone(defaults.scriptFormulas);
   saved.market_research = saved.market_research?.length ? saved.market_research : structuredClone(defaults.marketResearch);
+  saved.competitor_analyses = saved.competitor_analyses || [];
   return saved;
 }
 
@@ -240,7 +242,7 @@ function render() {
     dashboard: ["首頁儀表板", "追蹤本週內容與名單來源，快速看出值得加碼的素材。", renderDashboard],
     calendar: ["內容排程", "產生、編輯與匯出一週 7 天內容排程。", renderCalendar],
     "script-generator": ["腳本產生", "產出 Hook、口播、字幕、分鏡、封面與貼文文案。", renderScriptGenerator],
-    research: ["流量研究", "管理高流量腳本公式與市場研究素材，供腳本產生器借鑑。", renderResearch],
+    research: ["競品分析", "貼上同業影片連結或上傳影片，分析爆點並改寫成可樂吉版本。", renderResearch],
     "carousel-generator": ["連播圖文", "產出 6 到 8 頁連播圖文大綱與圖像提示詞。", renderCarouselGenerator],
     "copy-generator": ["社群文案", "產出 IG、Threads、限動互動與留言後私訊話術。", renderCopyGenerator],
     performance: ["成效追蹤", "手動輸入數據，分析主題、Hook、CTA 與內容形式。", renderPerformance],
@@ -259,7 +261,7 @@ function render() {
           ${navButton("dashboard", "⌂", "首頁儀表板")}
           ${navButton("calendar", "□", "內容排程")}
           ${navButton("script-generator", "▶", "腳本產生")}
-          ${navButton("research", "◎", "流量研究")}
+          ${navButton("research", "◎", "競品分析")}
           ${navButton("carousel-generator", "▤", "連播圖文")}
           ${navButton("copy-generator", "✎", "社群文案")}
           ${navButton("performance", "↗", "成效追蹤")}
@@ -502,31 +504,51 @@ function createWeeklySchedule(input, persistIdeas) {
 
 function renderResearch() {
   return `
-    <div class="grid two">
-      <div class="panel">
-        <h3>新增高流量腳本公式</h3>
-        <div class="form">
-          ${inputField("formulaName", "公式名稱", "text", "反常識開頭", "span-6")}
-          ${inputField("formulaBestFor", "適合目標", "text", "流量型、轉換型", "span-6")}
-          ${inputField("formulaHook", "Hook 公式", "text", "你以為 A，其實真正卡住的是 B", "span-12")}
-          ${textareaField("formulaStructure", "腳本結構", "反常識 Hook → 常見誤會 → 真正原因 → 生活例子 → 小行動 → CTA", "span-12")}
-          ${textareaField("formulaBorrow", "可借鑑重點", "用一句話打破受眾原本的判斷，讓人想知道自己是不是也搞錯。", "span-12")}
-          <div class="field span-12"><button class="btn" onclick="addScriptFormula()">加入公式資料庫</button></div>
+    <div class="panel">
+      <div class="split-title">
+        <h3>競品影片分析器</h3>
+        <span class="tag">連結或影片檔都可用</span>
+      </div>
+      <div class="notice" style="margin-bottom:12px">
+        直接貼 IG / TikTok / Shorts 連結最方便；若平台無法被系統讀取，請補上 Hook、逐字稿或畫面描述，分析會更準。上傳影片目前可保存影片資訊與預覽，但仍建議補逐字稿或重點。
+      </div>
+      <div class="form">
+        ${selectField("compInputType", "素材來源", ["貼連結", "上傳影片"], "貼連結", "span-3")}
+        ${inputField("compUrl", "影片連結", "url", "https://www.instagram.com/reel/...", "span-5")}
+        <div class="field span-4">
+          <label for="compVideoFile">上傳影片檔</label>
+          <input id="compVideoFile" type="file" accept="video/*" onchange="handleCompetitorVideoUpload(this)">
+        </div>
+        ${inputField("compPlatform", "平台", "text", "Instagram Reels", "span-3")}
+        ${inputField("compAccountType", "帳號類型", "text", "減重教練 / 健康教育", "span-3")}
+        ${selectField("compTargetTopic", "改寫主題", state.settings.topics, "壓力與減脂", "span-3")}
+        ${selectField("compTargetAudience", "改寫受眾", state.settings.audiences, "壓力大會亂吃的人", "span-3")}
+        ${inputField("compViews", "觀看數", "number", 0, "span-2")}
+        ${inputField("compComments", "留言數", "number", 0, "span-2")}
+        ${inputField("compShares", "分享數", "number", 0, "span-2")}
+        ${inputField("compSaves", "收藏數", "number", 0, "span-2")}
+        ${inputField("compLength", "影片長度", "text", "60 秒", "span-2")}
+        ${selectField("compCta", "改寫 CTA", state.settings.ctas, "留言「測驗」", "span-2")}
+        ${inputField("compHook", "原影片開頭 Hook", "text", "白天忍住，晚上卻爆吃？", "span-6")}
+        ${inputField("compCommentsTheme", "留言區常見反應", "text", "我也是、晚上最難控制、想知道怎麼改善", "span-6")}
+        ${textareaField("compTranscript", "影片逐字稿或大概內容", "貼上逐字稿，或用條列寫出影片講了什麼。", "span-6")}
+        ${textareaField("compScenes", "畫面分鏡描述", "例如：開頭自拍口播、切外送畫面、字幕列三個原因、最後 CTA。", "span-6")}
+        ${textareaField("compWhy", "你覺得它紅的原因", "例如：痛點很準、留言門檻低、Hook 很像我的日常。", "span-12")}
+        <div class="field span-12">
+          <div class="actions">
+            <button class="btn" onclick="analyzeCompetitorVideo()">分析並改寫</button>
+            <button class="btn secondary" onclick="copyCurrentCompetitorAnalysis()">複製分析結果</button>
+          </div>
         </div>
       </div>
-      <div class="panel">
-        <h3>新增市場研究素材</h3>
-        <div class="form">
-          ${inputField("researchPlatform", "平台", "text", "IG Reels / TikTok", "span-6")}
-          ${inputField("researchIndustry", "帳號或產業類型", "text", "減重教練 / 健康教育", "span-6")}
-          ${inputField("researchTopic", "主題", "text", "壓力暴食", "span-6")}
-          ${inputField("researchHook", "可借鑑 Hook", "text", "白天忍住，晚上卻爆吃？", "span-6")}
-          ${textareaField("researchStructure", "可借鑑腳本節奏", "生活場景 → 情緒承接 → 背後原因 → 小行動", "span-12")}
-          ${textareaField("researchInsight", "為什麼值得參考", "開頭有明確痛點，容易讓目標受眾覺得和自己有關。", "span-12")}
-          ${textareaField("researchAdapt", "改寫成可樂吉語氣", "用理解式語氣，不製造焦慮，不直接推銷。", "span-12")}
-          <div class="field span-12"><button class="btn" onclick="addMarketResearch()">加入市場素材庫</button></div>
-        </div>
+      <div id="competitorVideoPreview" class="video-preview"></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="copy-row">
+        <h3 style="margin:0">分析結果</h3>
+        <span class="muted small">會同時儲存到下方分析紀錄</span>
       </div>
+      <pre id="competitorAnalysisOutput" class="output">${escapeHtml(state.competitor_analyses[0] ? formatCompetitorAnalysis(state.competitor_analyses[0]) : "貼上競品影片資訊後，按「分析並改寫」。")}</pre>
     </div>
     <div class="grid two" style="margin-top:16px">
       <div class="panel">
@@ -565,6 +587,22 @@ function renderResearch() {
         </div>
       </div>
     </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="split-title">
+        <h3>競品分析紀錄</h3>
+        <span class="tag">${state.competitor_analyses.length} 筆</span>
+      </div>
+      <div class="list">
+        ${state.competitor_analyses.map((analysis) => `
+          <div class="item">
+            <strong>${analysis.platform}｜${analysis.topic}｜${analysis.detected_formula.name}</strong>
+            <p class="muted">${analysis.url || analysis.file_name || "未提供連結"}</p>
+            <p><b>爆點：</b>${analysis.viral_reason.slice(0, 2).join("、")}</p>
+            <p><b>可樂吉 Hook：</b>${analysis.rewrite_hooks[0]}</p>
+          </div>
+        `).join("") || `<p class="muted">尚無競品分析紀錄。</p>`}
+      </div>
+    </div>
   `;
 }
 
@@ -594,6 +632,200 @@ function addMarketResearch() {
   });
   save();
   render();
+}
+
+function handleCompetitorVideoUpload(input) {
+  const file = input.files?.[0];
+  const target = document.getElementById("competitorVideoPreview");
+  if (!file || !target) return;
+  const url = URL.createObjectURL(file);
+  target.innerHTML = `
+    <div class="notice">
+      已選擇影片：${escapeHtml(file.name)}｜${Math.round(file.size / 1024 / 1024 * 10) / 10} MB
+    </div>
+    <video controls src="${url}"></video>
+  `;
+}
+
+function analyzeCompetitorVideo() {
+  const input = {
+    input_type: val("compInputType"),
+    url: val("compUrl"),
+    file_name: document.getElementById("compVideoFile")?.files?.[0]?.name || "",
+    platform: val("compPlatform"),
+    account_type: val("compAccountType"),
+    topic: val("compTargetTopic"),
+    audience: val("compTargetAudience"),
+    views: numVal("compViews"),
+    comments: numVal("compComments"),
+    shares: numVal("compShares"),
+    saves: numVal("compSaves"),
+    length: val("compLength"),
+    cta: val("compCta"),
+    hook: val("compHook"),
+    comments_theme: val("compCommentsTheme"),
+    transcript: val("compTranscript"),
+    scenes: val("compScenes"),
+    why: val("compWhy")
+  };
+  const analysis = buildCompetitorAnalysis(input);
+  state.competitor_analyses.unshift(analysis);
+  state.market_research.unshift({
+    id: uid("research"),
+    platform: input.platform,
+    industry: input.account_type,
+    topic: input.topic,
+    hook: input.hook,
+    structure: analysis.structure,
+    insight: analysis.viral_reason.join("；"),
+    adapt_to_brand: analysis.borrowable.join("；")
+  });
+  const formulaExists = state.script_formulas.some((formula) => formula.id === analysis.detected_formula.id);
+  if (!formulaExists) state.script_formulas.unshift(analysis.detected_formula);
+  save();
+  const output = document.getElementById("competitorAnalysisOutput");
+  if (output) output.textContent = formatCompetitorAnalysis(analysis);
+}
+
+function buildCompetitorAnalysis(input) {
+  const text = `${input.hook} ${input.transcript} ${input.scenes} ${input.comments_theme} ${input.why}`;
+  const formula = detectCompetitorFormula(text, input);
+  const profile = scriptTopicProfile(input.topic, input.audience);
+  const engagementRate = safeDiv(input.comments + input.shares + input.saves, input.views);
+  const commentRate = safeDiv(input.comments, input.views);
+  const viralReason = [
+    input.hook ? `Hook 直接打中痛點：「${input.hook}」` : "開頭若能補上明確痛點，分析會更準。",
+    formula.borrow_point,
+    input.comments_theme ? `留言區反應顯示需求：${input.comments_theme}` : "建議補留言區反應，判斷它是共鳴、爭議還是諮詢需求。",
+    engagementRate ? `互動率約 ${pct(engagementRate)}，留言率約 ${pct(commentRate)}。` : "尚未輸入觀看與互動數，無法判斷互動率。"
+  ];
+  const borrowable = [
+    `借鑑 Hook 結構：${formula.hook_pattern}`,
+    `借鑑腳本節奏：${formula.structure}`,
+    `改成可樂吉語氣：先理解受眾，再指出卡點，不恐嚇、不保證療效。`,
+    `CTA 改為：${input.cta}`
+  ];
+  const risks = [
+    "不要直接複製原影片句子、分鏡和案例。",
+    "避免使用對方的個案結果、前後對比或品牌素材。",
+    "若原片有誇大瘦身承諾，改寫時要拿掉。",
+    "疾病、懷孕、用藥或飲食疾患相關內容，需提醒尋求專業醫療人員協助。"
+  ];
+  const rewriteHooks = competitorRewriteHooks(input.topic, input.audience, formula, profile);
+  const segments = competitorRewriteSegments(input, formula, profile, rewriteHooks[0]);
+  const storyboard = storyboardFor(input.topic, input.audience, segments, input.cta, formulaToStyle(formula.id), profile);
+  return {
+    id: uid("competitor"),
+    created_at: iso(),
+    ...input,
+    detected_formula: formula,
+    engagement_rate: engagementRate,
+    comment_rate: commentRate,
+    viral_reason: viralReason,
+    structure: formula.structure,
+    borrowable,
+    risks,
+    rewrite_hooks: rewriteHooks,
+    rewritten_script: segments,
+    storyboard,
+    ig_caption: igCaption(input.topic, input.audience, input.cta),
+    threads_copy: makeSocialCopy(input.topic, input.audience, "共鳴型", input.cta, uid("idea")).threads_copy
+  };
+}
+
+function detectCompetitorFormula(text, input) {
+  const normalized = text || "";
+  if (/1|2|二選一|哪一種|哪個/.test(normalized)) return findFormula("either-or");
+  if (/3|三個|三種|檢查|清單|狀況/.test(normalized)) return findFormula("three-checks");
+  if (/客人|案例|學員|會員|他原本|她原本/.test(normalized)) return findFormula("case-breakdown");
+  if (/一天|早上|中午|晚上|白天|下班|日常/.test(normalized)) return findFormula("day-in-life");
+  if (/不是|其實|以為|誤會|先別/.test(normalized)) return findFormula("counter-intuitive");
+  if (/復胖|又卡|每次|一直/.test(normalized)) return findFormula("failure-reason");
+  return findFormula(formulaForHookType(input.topic));
+}
+
+function formulaToStyle(id) {
+  return {
+    "counter-intuitive": "打臉迷思型",
+    "three-checks": "自我檢查型",
+    "day-in-life": "情境共鳴型",
+    "case-breakdown": "客戶案例型",
+    "either-or": "二選一互動型",
+    "failure-reason": "自我檢查型"
+  }[id] || "專業口播";
+}
+
+function competitorRewriteHooks(topic, audience, formula, profile) {
+  const map = {
+    "counter-intuitive": [`${topic}卡住，不一定是你以為的原因`, `先別再怪意志力，真正卡點可能在這`, `你以為是吃太多，其實可能是節奏亂了`],
+    "three-checks": [`有這 3 個狀況，難怪${topic}卡住`, `${audience}先檢查這 3 件事`, `減不下來前，先看這 3 個訊號`],
+    "day-in-life": [`你是不是也有這種減重的一天？`, `白天忍住，晚上卻又破功？`, `${audience}最常輸在生活節奏`],
+    "case-breakdown": [`有位客人一直以為自己吃太多`, `他卡住的原因，不是最後那一餐`, `一個${audience}常見的減脂卡點`],
+    "either-or": [`你是外食型，還是壓力型？`, `你比較像 1，還是 2？`, `留言 1 或 2，我猜你卡在哪`],
+    "failure-reason": [`為什麼你每次都卡在同一個地方？`, `不是你失敗，是卡點一直沒被處理`, `${topic}反覆卡住，先看這個原因`]
+  };
+  return (map[formula.id] || [profile.misconception, `${topic}先看這個卡點`, `${audience}減脂先別急著更少吃`]).map((h) => trimText(h, 30));
+}
+
+function competitorRewriteSegments(input, formula, profile, selectedHook) {
+  const style = formulaToStyle(formula.id);
+  return scriptSegments(input.topic, input.audience, "流量型", parseDuration(input.length), style, input.cta, profile, selectedHook, formula, [{
+    hook: input.hook,
+    platform: input.platform,
+    topic: input.topic,
+    insight: input.why || input.comments_theme || "競品影片有明確痛點和可借鑑節奏。"
+  }]);
+}
+
+function formatCompetitorAnalysis(analysis) {
+  return `# 競品影片分析｜${analysis.topic}
+
+素材來源：${analysis.input_type}
+平台：${analysis.platform}
+連結 / 檔案：${analysis.url || analysis.file_name || "未提供"}
+帳號類型：${analysis.account_type}
+觀看數：${number(analysis.views)}
+留言數：${number(analysis.comments)}
+分享數：${number(analysis.shares)}
+收藏數：${number(analysis.saves)}
+互動率：約 ${pct(analysis.engagement_rate)}
+留言率：約 ${pct(analysis.comment_rate)}
+
+## 1. 為什麼可能會紅
+${analysis.viral_reason.map((x) => `- ${x}`).join("\n")}
+
+## 2. 偵測到的腳本公式
+公式：${analysis.detected_formula.name}
+Hook 模式：${analysis.detected_formula.hook_pattern}
+腳本結構：${analysis.detected_formula.structure}
+
+## 3. 可借鑑元素
+${analysis.borrowable.map((x) => `- ${x}`).join("\n")}
+
+## 4. 不建議照抄 / 風險提醒
+${analysis.risks.map((x) => `- ${x}`).join("\n")}
+
+## 5. 可樂吉改寫版 Hook
+${analysis.rewrite_hooks.map((x, i) => `${i + 1}. ${x}`).join("\n")}
+
+## 6. 可樂吉短影音腳本
+${analysis.rewritten_script.map((segment) => `${segment.label} ${segment.time}：${segment.text}`).join("\n")}
+
+## 7. 分鏡表
+| 時間 | 畫面描述 | 口播 | 字卡 | B-roll | 圖像生成提示詞 |
+|---|---|---|---|---|---|
+${analysis.storyboard.map((row) => `| ${row.time} | ${row.visual} | ${row.voice} | ${row.card} | ${row.broll} | ${row.prompt} |`).join("\n")}
+
+## 8. IG 文案
+${analysis.ig_caption}
+
+## 9. Threads 文案
+${analysis.threads_copy.join("\n\n---\n\n")}`;
+}
+
+function copyCurrentCompetitorAnalysis() {
+  const output = document.getElementById("competitorAnalysisOutput");
+  if (output) navigator.clipboard.writeText(output.textContent);
 }
 
 function renderScriptGenerator() {

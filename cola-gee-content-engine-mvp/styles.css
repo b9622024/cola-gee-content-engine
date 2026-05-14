@@ -493,6 +493,20 @@ tr:last-child td {
   min-height: 82px;
 }
 
+.video-preview {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.video-preview video {
+  width: min(100%, 360px);
+  max-height: 520px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #111;
+}
+
 @media (max-width: 980px) {
   .app {
     grid-template-columns: 1fr;
