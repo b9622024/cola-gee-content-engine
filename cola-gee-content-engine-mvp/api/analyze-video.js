@@ -7,6 +7,7 @@ module.exports = async function handler(req, res) {
       ok: true,
       service: "analyze-video",
       openai_key_configured: Boolean(apiKey),
+      blob_token_configured: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
       message: apiKey ? "API 已部署，OPENAI_API_KEY 已設定。" : "API 已部署，但缺少 OPENAI_API_KEY。"
     });
   }
@@ -22,10 +23,12 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = await readJson(req);
-    const video = parseDataUrl(body.video_data_url || "");
-    if (!video) return send(res, 400, { error: "請上傳影片檔。" });
-    if (video.buffer.length > 4 * 1024 * 1024) {
-      return send(res, 413, { error: "影片檔目前建議小於 4MB。Vercel 會限制請求大小，請先裁短或壓縮後再上傳。" });
+    const video = body.video_url
+      ? await fetchVideoFromUrl(body.video_url)
+      : parseDataUrl(body.video_data_url || "");
+    if (!video) return send(res, 400, { error: "請上傳影片檔，或先透過 Blob 上傳取得影片網址。" });
+    if (video.buffer.length > 22 * 1024 * 1024) {
+      return send(res, 413, { error: "影片檔目前建議小於 20MB。OpenAI 逐字稿 API 有檔案大小限制，請先裁短或壓縮後再上傳。" });
     }
 
     const transcript = await transcribeVideo(apiKey, video, body.file_name || "competitor-video.mp4");
@@ -140,13 +143,32 @@ function parseDataUrl(dataUrl) {
   };
 }
 
+async function fetchVideoFromUrl(url) {
+  const value = String(url || "");
+  if (!value.startsWith("https://")) {
+    throw new Error("Blob 影片網址格式不正確。");
+  }
+  const response = await fetch(value);
+  if (!response.ok) throw new Error(`Blob 影片讀取失敗：HTTP ${response.status}`);
+  const contentType = response.headers.get("content-type") || "video/mp4";
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > 22 * 1024 * 1024) {
+    throw new Error("影片檔目前建議小於 20MB，請先裁短或壓縮後再上傳。");
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    mimeType: contentType,
+    buffer: Buffer.from(arrayBuffer)
+  };
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
     req.on("data", (chunk) => {
       raw += chunk;
-      if (raw.length > 38_000_000) {
-        reject(new Error("影片資料太大，請改上傳 4MB 以下影片。"));
+      if (raw.length > 4_000_000) {
+        reject(new Error("請使用 Blob 大檔案上傳，不要把影片直接送進 API。"));
         req.destroy();
       }
     });
