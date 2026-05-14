@@ -550,6 +550,14 @@ function renderResearch() {
         <h3 style="margin:0">分析結果</h3>
         <span class="muted small">會同時儲存到下方分析紀錄</span>
       </div>
+      <div id="videoAnalysisProgress" class="analysis-progress hidden">
+        <div class="progress-top">
+          <strong id="videoAnalysisStage">尚未開始</strong>
+          <span id="videoAnalysisPercent">0%</span>
+        </div>
+        <div class="progress-bar"><span id="videoAnalysisBar" style="width:0%"></span></div>
+        <div id="videoAnalysisDetail" class="muted small">結果會顯示在下方。</div>
+      </div>
       <pre id="competitorAnalysisOutput" class="output">${escapeHtml(state.competitor_analyses[0] ? formatCompetitorAnalysis(state.competitor_analyses[0]) : "貼上競品影片資訊後，按「分析並改寫」。")}</pre>
     </div>
     <div class="grid two" style="margin-top:16px">
@@ -651,6 +659,39 @@ function handleCompetitorVideoUpload(input) {
   `;
 }
 
+let videoAnalysisTimer = null;
+let videoAnalysisStartedAt = 0;
+
+function setVideoAnalysisProgress(stage, percent, detail) {
+  const wrapper = document.getElementById("videoAnalysisProgress");
+  const stageEl = document.getElementById("videoAnalysisStage");
+  const percentEl = document.getElementById("videoAnalysisPercent");
+  const barEl = document.getElementById("videoAnalysisBar");
+  const detailEl = document.getElementById("videoAnalysisDetail");
+  const safePercent = Math.max(0, Math.min(100, Math.round(percent || 0)));
+  if (wrapper) wrapper.classList.remove("hidden");
+  if (stageEl) stageEl.textContent = stage || "處理中";
+  if (percentEl) percentEl.textContent = `${safePercent}%`;
+  if (barEl) barEl.style.width = `${safePercent}%`;
+  if (detailEl) detailEl.textContent = detail || "";
+}
+
+function startVideoAnalysisTimer(stage, percent, detailPrefix) {
+  stopVideoAnalysisTimer();
+  videoAnalysisStartedAt = Date.now();
+  setVideoAnalysisProgress(stage, percent, `${detailPrefix || "正在處理"}，已等待 0 秒。`);
+  videoAnalysisTimer = setInterval(() => {
+    const seconds = Math.floor((Date.now() - videoAnalysisStartedAt) / 1000);
+    const detail = `${detailPrefix || "正在處理"}，已等待 ${seconds} 秒。請保持此頁面開啟。`;
+    setVideoAnalysisProgress(stage, percent, detail);
+  }, 1000);
+}
+
+function stopVideoAnalysisTimer() {
+  if (videoAnalysisTimer) clearInterval(videoAnalysisTimer);
+  videoAnalysisTimer = null;
+}
+
 async function checkVideoAiApi() {
   const output = document.getElementById("competitorAnalysisOutput");
   if (output) output.textContent = "正在檢查 AI 影片分析 API...";
@@ -692,6 +733,7 @@ BLOB_READ_WRITE_TOKEN：${data.blob_token_configured || uploadCheck?.blob_token_
 async function autoAnalyzeUploadedVideo() {
   const file = document.getElementById("compVideoFile")?.files?.[0];
   const output = document.getElementById("competitorAnalysisOutput");
+  const analyzeButton = Array.from(document.querySelectorAll("button")).find((button) => button.textContent.includes("自動分析上傳影片"));
   if (!file) {
     if (output) output.textContent = "請先選擇影片檔，再按「自動分析上傳影片」。";
     return;
@@ -701,20 +743,26 @@ async function autoAnalyzeUploadedVideo() {
     return;
   }
   const useBlobUpload = file.size > 4 * 1024 * 1024;
+  if (analyzeButton) analyzeButton.disabled = true;
   if (output) {
     output.textContent = useBlobUpload
       ? "正在上傳影片到 Vercel Blob、抽取關鍵畫面並轉逐字稿，請稍候..."
       : "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
   }
   try {
+    setVideoAnalysisProgress("準備影片", 5, `已選擇 ${file.name}，檔案大小 ${Math.round(file.size / 1024 / 1024 * 10) / 10} MB。`);
     const framesPromise = extractVideoFrames(file, 3);
     const videoPayloadPromise = useBlobUpload
-      ? uploadCompetitorVideoToBlob(file)
+      ? uploadCompetitorVideoToBlob(file, (percentage) => {
+          const mapped = 10 + percentage * 0.45;
+          setVideoAnalysisProgress("上傳到 Vercel Blob", mapped, `正在上傳影片：${Math.round(percentage)}%。上傳完成後會自動進入 AI 分析。`);
+        })
       : fileToDataUrl(file);
+    setVideoAnalysisProgress(useBlobUpload ? "上傳與抽取畫面" : "抽取畫面", 10, "正在從影片抽取 3 張關鍵畫面，用來分析分鏡節奏。");
     const [videoPayload, frames] = await Promise.all([videoPayloadPromise, framesPromise]);
-    if (output && useBlobUpload) {
-      output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
-    }
+    setVideoAnalysisProgress("影片已就緒", 58, useBlobUpload ? "Blob 上傳完成，關鍵畫面也已抽取完成。" : "影片與關鍵畫面已讀取完成。");
+    if (output && useBlobUpload) output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
+    startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -743,6 +791,8 @@ async function autoAnalyzeUploadedVideo() {
       const detail = data.error || rawText.slice(0, 240) || "沒有回傳錯誤內容";
       throw new Error(`HTTP ${response.status}：${detail}`);
     }
+    stopVideoAnalysisTimer();
+    setVideoAnalysisProgress("分析完成", 100, "結果已產生，會顯示在下方並儲存到分析紀錄。");
     if (document.getElementById("compTranscript")) {
       document.getElementById("compTranscript").value = data.transcript || "";
     }
@@ -769,6 +819,8 @@ async function autoAnalyzeUploadedVideo() {
     });
     save();
   } catch (error) {
+    stopVideoAnalysisTimer();
+    setVideoAnalysisProgress("分析失敗", 100, error.message || "請查看下方錯誤原因。");
     if (output) output.textContent = `自動分析失敗：${error.message}
 
 你可以先檢查：
@@ -777,15 +829,22 @@ async function autoAnalyzeUploadedVideo() {
 3. 影片是否小於 20MB，格式建議 mp4、mov 或 webm
 4. OpenAI 帳號是否有可用額度或付款方式
 5. 如果只看到 404，代表 API 檔案沒有部署成功`;
+  } finally {
+    if (analyzeButton) analyzeButton.disabled = false;
   }
 }
 
-async function uploadCompetitorVideoToBlob(file) {
+async function uploadCompetitorVideoToBlob(file, onProgress) {
   const { upload } = await import("https://esm.sh/@vercel/blob@latest/client?bundle");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
   const blob = await upload(safeName, file, {
     access: "public",
-    handleUploadUrl: "/api/upload-video"
+    handleUploadUrl: "/api/upload-video",
+    onUploadProgress(event) {
+      if (typeof onProgress === "function") {
+        onProgress(event.percentage || 0);
+      }
+    }
   });
   return blob.url;
 }

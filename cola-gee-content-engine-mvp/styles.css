@@ -438,6 +438,42 @@ tr:last-child td {
   font-size: 12px;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.analysis-progress {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf6;
+  padding: 12px;
+  margin: 10px 0 12px;
+}
+
+.progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #dce5df;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--brand), var(--accent));
+  transition: width 0.25s ease;
+}
+
 .calendar-card-list {
   display: none;
 }
