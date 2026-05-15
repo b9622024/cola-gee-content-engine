@@ -739,7 +739,9 @@ async function autoAnalyzeUploadedVideo() {
     return;
   }
   if (file.size > 20 * 1024 * 1024) {
-    if (output) output.textContent = "目前大檔案版本建議上傳 20MB 以下影片。再大的影片會接近 OpenAI 逐字稿限制，請先裁短或壓縮後再上傳。";
+    const sizeMb = Math.round(file.size / 1024 / 1024 * 10) / 10;
+    setVideoAnalysisProgress("影片過大", 100, `這支影片約 ${sizeMb}MB，超過目前 20MB 上限。請先壓縮或裁短後再上傳。`);
+    if (output) output.textContent = `目前影片約 ${sizeMb}MB，超過工具設定的 20MB 上限。\n\n建議先把影片壓縮到 20MB 以下，或裁成 30 到 60 秒內再上傳。`;
     return;
   }
   const useBlobUpload = file.size > 4 * 1024 * 1024;
@@ -926,10 +928,6 @@ function waitForBlobNearCompleteFallback({ getPercentage, predictedUrl }) {
       lastCheckedAt = Date.now();
       checkCount += 1;
       setVideoAnalysisProgress("確認 Blob 完成", 59, `影片已傳到 99%，第 ${checkCount} 次確認 Blob 是否可讀。`);
-      if (checkCount > 18) {
-        setVideoAnalysisProgress("等待 Blob 完成", 59, "影片已傳到 99%，但 Blob 還沒有回傳完成結果，仍在等待。");
-        return;
-      }
       if (!predictedUrl) {
         return;
       }
@@ -938,11 +936,17 @@ function waitForBlobNearCompleteFallback({ getPercentage, predictedUrl }) {
         if (ok) {
           clearInterval(timer);
           resolve(predictedUrl);
+          return;
+        }
+        if (checkCount >= 4) {
+          clearInterval(timer);
+          setVideoAnalysisProgress("使用 Blob 備援網址", 60, "影片已傳到 99% 一段時間，先交給後端確認並進入 AI 分析。");
+          resolve(predictedUrl);
         }
       } catch (error) {
-        if (checkCount >= 6) {
+        if (checkCount >= 4) {
           clearInterval(timer);
-          setVideoAnalysisProgress("使用 Blob 備援網址", 60, "影片已傳到 99% 一段時間，先使用 Blob 預估網址進入 AI 分析。");
+          setVideoAnalysisProgress("使用 Blob 備援網址", 60, "影片已傳到 99% 一段時間，先交給後端確認並進入 AI 分析。");
           resolve(predictedUrl);
           return;
         }
