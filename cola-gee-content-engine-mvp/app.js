@@ -770,6 +770,9 @@ async function autoAnalyzeUploadedVideo() {
     const videoPayload = useLocalCompression
         ? await compressVideoForDirectAnalysis(file)
       : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
+    const audioPayload = useLocalCompression
+      ? await readOriginalAudioForTranscription(file)
+      : videoPayload;
     setVideoAnalysisProgress("影片已就緒", 62, useLocalCompression ? "影片已壓縮完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
     startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
@@ -779,6 +782,8 @@ async function autoAnalyzeUploadedVideo() {
         file_name: file.name,
         video_data_url: useBlobUpload ? "" : videoPayload,
         video_url: useBlobUpload ? videoPayload : "",
+        audio_data_url: audioPayload,
+        audio_file_name: file.name,
         frames,
         source_url: val("compUrl"),
         platform: val("compPlatform"),
@@ -925,6 +930,11 @@ async function compressVideoForDirectAnalysis(file) {
     }
   }
   throw new Error(`${lastError?.message || "影片壓縮失敗"} 請先把影片壓到 4MB 以下，或換一支較短影片測試。`);
+}
+
+async function readOriginalAudioForTranscription(file) {
+  setVideoAnalysisProgress("讀取原始音訊", 60, "正在保留原始影片音訊，避免壓縮音軌造成逐字稿失敗。");
+  return withTimeout(fileToDataUrl(file), 60000, "原始影片讀取超過 60 秒，請確認檔案格式。");
 }
 
 function recordCompressedVideo(file, options) {

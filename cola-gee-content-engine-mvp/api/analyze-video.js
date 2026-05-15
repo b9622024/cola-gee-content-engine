@@ -26,12 +26,13 @@ module.exports = async function handler(req, res) {
     const video = body.video_url
       ? await fetchVideoFromUrl(body.video_url)
       : parseDataUrl(body.video_data_url || "");
-    if (!video) return send(res, 400, { error: "請上傳影片檔，或先透過 Blob 上傳取得影片網址。" });
-    if (video.buffer.length > 22 * 1024 * 1024) {
+    const audio = parseDataUrl(body.audio_data_url || "") || video;
+    if (!audio) return send(res, 400, { error: "請上傳影片檔，或先透過 Blob 上傳取得影片網址。" });
+    if (audio.buffer.length > 22 * 1024 * 1024) {
       return send(res, 413, { error: "影片檔目前建議小於 20MB。OpenAI 逐字稿 API 有檔案大小限制，請先裁短或壓縮後再上傳。" });
     }
 
-    const transcript = await transcribeVideo(apiKey, video, body.file_name || "competitor-video.mp4");
+    const transcript = await transcribeVideo(apiKey, audio, body.audio_file_name || body.file_name || "competitor-video.mp4");
     const analysis = await analyzeFramesAndRewrite(apiKey, {
       ...body,
       transcript,
@@ -203,8 +204,8 @@ function readJson(req) {
     let raw = "";
     req.on("data", (chunk) => {
       raw += chunk;
-      if (raw.length > 4_000_000) {
-        reject(new Error("請使用 Blob 大檔案上傳，不要把影片直接送進 API。"));
+      if (raw.length > 18_000_000) {
+        reject(new Error("影片資料太大，請先裁短或壓縮後再上傳。"));
         req.destroy();
       }
     });
