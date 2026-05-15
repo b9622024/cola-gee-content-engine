@@ -744,12 +744,12 @@ async function autoAnalyzeUploadedVideo() {
     if (output) output.textContent = `目前影片約 ${sizeMb}MB，超過工具設定的 20MB 上限。\n\n建議先把影片壓縮到 20MB 以下，或裁成 30 到 60 秒內再上傳。`;
     return;
   }
-  const useLocalCompression = file.size > 4 * 1024 * 1024 && file.size <= 15 * 1024 * 1024;
-  const useBlobUpload = file.size > 4 * 1024 * 1024 && !useLocalCompression;
+  const useLocalCompression = file.size > 4 * 1024 * 1024;
+  const useBlobUpload = false;
   if (analyzeButton) analyzeButton.disabled = true;
   if (output) {
-    output.textContent = useBlobUpload
-      ? "正在上傳影片到 Vercel Blob、抽取關鍵畫面並轉逐字稿，請稍候..."
+    output.textContent = useLocalCompression
+      ? "正在本機壓縮影片、抽取關鍵畫面並轉逐字稿，請稍候..."
       : "正在讀取影片、抽取關鍵畫面並轉逐字稿，請稍候...";
   }
   try {
@@ -766,21 +766,11 @@ async function autoAnalyzeUploadedVideo() {
       ? `已抽取 ${frames.length} 張關鍵畫面。`
       : "未取得關鍵畫面，會先用影片逐字稿與你填寫的欄位分析。";
 
-    setVideoAnalysisProgress(useBlobUpload ? "準備上傳 Blob" : useLocalCompression ? "本機壓縮影片" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
-    const videoPayload = useBlobUpload
-      ? await withTimeout(
-          uploadCompetitorVideoToBlob(file, (percentage) => {
-            const mapped = 18 + percentage * 0.42;
-            setVideoAnalysisProgress("上傳到 Vercel Blob", mapped, `正在上傳影片：${Math.round(percentage)}%。上傳完成後會自動進入 AI 分析。`);
-          }),
-          900000,
-          "影片上傳超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
-        )
-      : useLocalCompression
+    setVideoAnalysisProgress(useLocalCompression ? "本機壓縮影片" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
+    const videoPayload = useLocalCompression
         ? await compressVideoForDirectAnalysis(file)
       : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
-    setVideoAnalysisProgress("影片已就緒", 62, useBlobUpload ? "Blob 上傳完成，準備交給 AI 轉逐字稿。" : useLocalCompression ? "影片已壓縮完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
-    if (output && useBlobUpload) output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
+    setVideoAnalysisProgress("影片已就緒", 62, useLocalCompression ? "影片已壓縮完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
     startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
       method: "POST",
@@ -947,6 +937,7 @@ function recordCompressedVideo(file, options) {
 
     video.preload = "auto";
     video.muted = false;
+    video.volume = 0;
     video.playsInline = true;
     video.src = objectUrl;
 
