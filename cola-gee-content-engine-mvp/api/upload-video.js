@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
     const jsonResponse = await handleUpload({
       body,
       request: req,
-      onBeforeGenerateToken: async (pathname) => {
+      onBeforeGenerateToken: async (pathname, _clientPayload, multipart) => {
         const cleanName = String(pathname || "competitor-video.mp4").replace(/[^\w.\-]/g, "-");
         return {
           allowedContentTypes: [
@@ -37,6 +37,7 @@ module.exports = async function handler(req, res) {
             "video/x-m4v"
           ],
           addRandomSuffix: false,
+          multipart: Boolean(multipart),
           tokenPayload: JSON.stringify({
             source: "cola-gee-competitor-analysis",
             fileName: cleanName,

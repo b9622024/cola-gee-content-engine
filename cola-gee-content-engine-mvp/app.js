@@ -852,9 +852,10 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
   setVideoAnalysisProgress("載入上傳模組", 16, "正在載入站內 Blob 上傳工具。");
   const { put } = await import("/vendor/vercel-blob-client.js");
   const safeName = `competitor-videos/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "-")}`;
+  const useMultipart = file.size > 4 * 1024 * 1024;
   setVideoAnalysisProgress("檢查上傳授權", 17, "正在確認 Vercel Blob 授權 API 是否正常回應。");
-  const clientToken = await preflightBlobUploadToken(safeName);
-  setVideoAnalysisProgress("開始上傳 Blob", 20, "Blob 授權正常，正在開始上傳影片。");
+  const clientToken = await preflightBlobUploadToken(safeName, { multipart: useMultipart });
+  setVideoAnalysisProgress("開始上傳 Blob", 20, useMultipart ? "Blob 授權正常，正在使用分段上傳影片。" : "Blob 授權正常，正在開始上傳影片。");
   let progressStarted = false;
   let latestPercentage = 0;
   let stallTimer;
@@ -870,6 +871,7 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
       access: "public",
       token: clientToken,
       contentType: file.type || "video/mp4",
+      multipart: useMultipart,
       onUploadProgress(event) {
         progressStarted = true;
         latestPercentage = event.percentage || 0;
@@ -905,8 +907,10 @@ function buildVercelBlobUrl(clientToken, pathname) {
 
 function waitForBlobNearCompleteFallback({ getPercentage, predictedUrl }) {
   let timer;
-  const promise = new Promise((resolve, reject) => {
+  const promise = new Promise((resolve) => {
     let startedWaitingAt = 0;
+    let lastCheckedAt = 0;
+    let checkCount = 0;
     timer = setInterval(async () => {
       const percentage = Number(getPercentage() || 0);
       if (percentage < 99) return;
@@ -915,18 +919,30 @@ function waitForBlobNearCompleteFallback({ getPercentage, predictedUrl }) {
         setVideoAnalysisProgress("確認 Blob 完成", 59, "影片已傳到 99%，正在確認 Blob 影片網址是否可讀。");
         return;
       }
-      if (Date.now() - startedWaitingAt < 18000) return;
-      clearInterval(timer);
       if (!predictedUrl) {
-        reject(new Error("影片已接近上傳完成，但無法組出 Blob 影片網址。"));
+        setVideoAnalysisProgress("等待 Blob 完成", 59, "影片已傳到 99%，正在等待 Vercel Blob 回傳完成結果。");
+        return;
+      }
+      if (Date.now() - startedWaitingAt < 30000) return;
+      if (Date.now() - lastCheckedAt < 10000) return;
+      lastCheckedAt = Date.now();
+      checkCount += 1;
+      setVideoAnalysisProgress("確認 Blob 完成", 59, `影片已傳到 99%，第 ${checkCount} 次確認 Blob 是否可讀。`);
+      if (checkCount > 18) {
+        setVideoAnalysisProgress("等待 Blob 完成", 59, "影片已傳到 99%，但 Blob 還沒有回傳完成結果，仍在等待。");
+        return;
+      }
+      if (!predictedUrl) {
         return;
       }
       try {
         const ok = await verifyBlobUrl(predictedUrl);
-        if (!ok) throw new Error("Blob 影片網址尚未可讀。");
-        resolve(predictedUrl);
+        if (ok) {
+          clearInterval(timer);
+          resolve(predictedUrl);
+        }
       } catch (error) {
-        reject(new Error(`影片已傳到 99%，但 Blob 完成確認失敗：${error.message}`));
+        setVideoAnalysisProgress("等待 Blob 完成", 59, `影片已傳到 99%，Blob 暫時尚未可讀，會繼續等待。${error.message || ""}`);
       }
     }, 2000);
   });
@@ -945,7 +961,7 @@ async function verifyBlobUrl(url) {
   return response.ok || response.status === 206;
 }
 
-async function preflightBlobUploadToken(pathname) {
+async function preflightBlobUploadToken(pathname, options = {}) {
   const response = await fetchWithTimeout("/api/upload-video", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -955,7 +971,7 @@ async function preflightBlobUploadToken(pathname) {
         pathname,
         callbackUrl: `${window.location.origin}/api/upload-video`,
         clientPayload: null,
-        multipart: false
+        multipart: Boolean(options.multipart)
       }
     })
   }, 30000, "Vercel Blob 上傳授權 API 超過 30 秒沒有回應。請檢查 api/upload-video.js 是否已部署，以及 BLOB_READ_WRITE_TOKEN 是否有效。");
