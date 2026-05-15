@@ -594,15 +594,28 @@ function renderResearch() {
         <span class="tag">${state.competitor_analyses.length} 筆</span>
       </div>
       <div class="list">
-        ${state.competitor_analyses.map((analysis) => `
-          <div class="item">
-            <strong>${analysis.platform}｜${analysis.topic}｜${analysis.detected_formula.name}</strong>
-            <p class="muted">${analysis.url || analysis.file_name || "未提供連結"}</p>
-            <p><b>爆點：</b>${analysis.viral_reason.slice(0, 2).join("、")}</p>
-            <p><b>可樂吉 Hook：</b>${analysis.rewrite_hooks[0]}</p>
-          </div>
-        `).join("") || `<p class="muted">尚無競品分析紀錄。</p>`}
+        ${state.competitor_analyses.map(competitorAnalysisCard).join("") || `<p class="muted">尚無競品分析紀錄。</p>`}
       </div>
+    </div>
+  `;
+}
+
+function competitorAnalysisCard(analysis) {
+  const platform = analysis.platform || "未分類平台";
+  const topic = analysis.topic || "未設定主題";
+  const formulaName = analysis.detected_formula?.name || "AI 自動分析";
+  const viralReason = Array.isArray(analysis.viral_reason) && analysis.viral_reason.length
+    ? analysis.viral_reason.slice(0, 2).join("、")
+    : "請查看完整 AI 分析結果。";
+  const rewriteHook = Array.isArray(analysis.rewrite_hooks) && analysis.rewrite_hooks.length
+    ? analysis.rewrite_hooks[0]
+    : "請查看完整 AI 分析結果。";
+  return `
+    <div class="item">
+      <strong>${escapeHtml(platform)}｜${escapeHtml(topic)}｜${escapeHtml(formulaName)}</strong>
+      <p class="muted">${escapeHtml(analysis.url || analysis.file_name || "未提供連結")}</p>
+      <p><b>爆點：</b>${escapeHtml(viralReason)}</p>
+      <p><b>可樂吉 Hook：</b>${escapeHtml(rewriteHook)}</p>
     </div>
   `;
 }
@@ -1537,12 +1550,21 @@ function competitorRewriteSegments(input, formula, profile, selectedHook) {
 }
 
 function formatCompetitorAnalysis(analysis) {
-  return `# 競品影片分析｜${analysis.topic}
+  if (analysis.auto_analysis_markdown) return analysis.auto_analysis_markdown;
+  const detectedFormula = analysis.detected_formula || {};
+  const viralReason = Array.isArray(analysis.viral_reason) ? analysis.viral_reason : ["請查看完整 AI 分析結果。"];
+  const borrowable = Array.isArray(analysis.borrowable) ? analysis.borrowable : ["可借鑑影片的開頭節奏、痛點切入與 CTA 位置。"];
+  const risks = Array.isArray(analysis.risks) ? analysis.risks : ["避免照抄原影片句子、案例與畫面。"];
+  const rewriteHooks = Array.isArray(analysis.rewrite_hooks) ? analysis.rewrite_hooks : ["請查看完整 AI 分析結果。"];
+  const rewrittenScript = Array.isArray(analysis.rewritten_script) ? analysis.rewritten_script : [];
+  const storyboard = Array.isArray(analysis.storyboard) ? analysis.storyboard : [];
+  const threadsCopy = Array.isArray(analysis.threads_copy) ? analysis.threads_copy : [];
+  return `# 競品影片分析｜${analysis.topic || "未設定主題"}
 
-素材來源：${analysis.input_type}
-平台：${analysis.platform}
+素材來源：${analysis.input_type || "自動分析"}
+平台：${analysis.platform || "未分類平台"}
 連結 / 檔案：${analysis.url || analysis.file_name || "未提供"}
-帳號類型：${analysis.account_type}
+帳號類型：${analysis.account_type || "減重教練 / 健康教育"}
 觀看數：${number(analysis.views)}
 留言數：${number(analysis.comments)}
 分享數：${number(analysis.shares)}
@@ -1551,35 +1573,35 @@ function formatCompetitorAnalysis(analysis) {
 留言率：約 ${pct(analysis.comment_rate)}
 
 ## 1. 為什麼可能會紅
-${analysis.viral_reason.map((x) => `- ${x}`).join("\n")}
+${viralReason.map((x) => `- ${x}`).join("\n")}
 
 ## 2. 偵測到的腳本公式
-公式：${analysis.detected_formula.name}
-Hook 模式：${analysis.detected_formula.hook_pattern}
-腳本結構：${analysis.detected_formula.structure}
+公式：${detectedFormula.name || "AI 自動分析"}
+Hook 模式：${detectedFormula.hook_pattern || "從痛點或反差開場"}
+腳本結構：${detectedFormula.structure || "Hook → 痛點 → 觀點 → 例子 → CTA"}
 
 ## 3. 可借鑑元素
-${analysis.borrowable.map((x) => `- ${x}`).join("\n")}
+${borrowable.map((x) => `- ${x}`).join("\n")}
 
 ## 4. 不建議照抄 / 風險提醒
-${analysis.risks.map((x) => `- ${x}`).join("\n")}
+${risks.map((x) => `- ${x}`).join("\n")}
 
 ## 5. 可樂吉改寫版 Hook
-${analysis.rewrite_hooks.map((x, i) => `${i + 1}. ${x}`).join("\n")}
+${rewriteHooks.map((x, i) => `${i + 1}. ${x}`).join("\n")}
 
 ## 6. 可樂吉短影音腳本
-${analysis.rewritten_script.map((segment) => `${segment.label} ${segment.time}：${segment.text}`).join("\n")}
+${rewrittenScript.map((segment) => `${segment.label} ${segment.time}：${segment.text}`).join("\n") || "請查看完整 AI 分析結果。"}
 
 ## 7. 分鏡表
 | 時間 | 畫面描述 | 口播 | 字卡 | B-roll | 圖像生成提示詞 |
 |---|---|---|---|---|---|
-${analysis.storyboard.map((row) => `| ${row.time} | ${row.visual} | ${row.voice} | ${row.card} | ${row.broll} | ${row.prompt} |`).join("\n")}
+${storyboard.map((row) => `| ${row.time} | ${row.visual} | ${row.voice} | ${row.card} | ${row.broll} | ${row.prompt} |`).join("\n")}
 
 ## 8. IG 文案
-${analysis.ig_caption}
+${analysis.ig_caption || "請查看完整 AI 分析結果。"}
 
 ## 9. Threads 文案
-${analysis.threads_copy.join("\n\n---\n\n")}`;
+${threadsCopy.join("\n\n---\n\n") || "請查看完整 AI 分析結果。"}`;
 }
 
 function copyCurrentCompetitorAnalysis() {
