@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
             "video/webm",
             "video/x-m4v"
           ],
-          addRandomSuffix: true,
+          addRandomSuffix: false,
           tokenPayload: JSON.stringify({
             source: "cola-gee-competitor-analysis",
             fileName: cleanName,

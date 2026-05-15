@@ -856,6 +856,7 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
   const clientToken = await preflightBlobUploadToken(safeName);
   setVideoAnalysisProgress("開始上傳 Blob", 20, "Blob 授權正常，正在開始上傳影片。");
   let progressStarted = false;
+  let latestPercentage = 0;
   let stallTimer;
   const stallPromise = new Promise((_, reject) => {
     stallTimer = setTimeout(() => {
@@ -864,28 +865,84 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
       }
     }, 45000);
   });
+  const predictedUrl = buildVercelBlobUrl(clientToken, safeName);
   const uploadPromise = put(safeName, file, {
       access: "public",
       token: clientToken,
       contentType: file.type || "video/mp4",
       onUploadProgress(event) {
         progressStarted = true;
+        latestPercentage = event.percentage || 0;
         if (stallTimer) clearTimeout(stallTimer);
         if (typeof onProgress === "function") {
-          onProgress(event.percentage || 0);
+          onProgress(latestPercentage);
         }
       }
     });
+  const nearCompleteFallback = waitForBlobNearCompleteFallback({
+    getPercentage: () => latestPercentage,
+    predictedUrl
+  });
   const blob = await withTimeout(
-    Promise.race([uploadPromise, stallPromise]).finally(() => {
+    Promise.race([uploadPromise, stallPromise, nearCompleteFallback]).finally(() => {
       if (stallTimer) clearTimeout(stallTimer);
+      if (nearCompleteFallback.cancel) nearCompleteFallback.cancel();
     }),
     900000,
     "影片上傳或取得 Blob 授權超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
   );
   if (typeof onProgress === "function") onProgress(100);
   setVideoAnalysisProgress("Blob 上傳完成", 60, "影片已上傳完成，正在進入 AI 轉逐字稿與分析。");
-  return blob.url;
+  return typeof blob === "string" ? blob : blob.url;
+}
+
+function buildVercelBlobUrl(clientToken, pathname) {
+  const parts = String(clientToken || "").split("_");
+  const storeId = parts[3];
+  if (!storeId) return "";
+  return `https://${storeId}.public.blob.vercel-storage.com/${encodeURI(pathname)}`;
+}
+
+function waitForBlobNearCompleteFallback({ getPercentage, predictedUrl }) {
+  let timer;
+  const promise = new Promise((resolve, reject) => {
+    let startedWaitingAt = 0;
+    timer = setInterval(async () => {
+      const percentage = Number(getPercentage() || 0);
+      if (percentage < 99) return;
+      if (!startedWaitingAt) {
+        startedWaitingAt = Date.now();
+        setVideoAnalysisProgress("確認 Blob 完成", 59, "影片已傳到 99%，正在確認 Blob 影片網址是否可讀。");
+        return;
+      }
+      if (Date.now() - startedWaitingAt < 18000) return;
+      clearInterval(timer);
+      if (!predictedUrl) {
+        reject(new Error("影片已接近上傳完成，但無法組出 Blob 影片網址。"));
+        return;
+      }
+      try {
+        const ok = await verifyBlobUrl(predictedUrl);
+        if (!ok) throw new Error("Blob 影片網址尚未可讀。");
+        resolve(predictedUrl);
+      } catch (error) {
+        reject(new Error(`影片已傳到 99%，但 Blob 完成確認失敗：${error.message}`));
+      }
+    }, 2000);
+  });
+  promise.cancel = () => {
+    if (timer) clearInterval(timer);
+  };
+  return promise;
+}
+
+async function verifyBlobUrl(url) {
+  const response = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: { Range: "bytes=0-1" },
+    cache: "no-store"
+  }, 15000, "確認 Blob 影片網址逾時。");
+  return response.ok || response.status === 206;
 }
 
 async function preflightBlobUploadToken(pathname) {
