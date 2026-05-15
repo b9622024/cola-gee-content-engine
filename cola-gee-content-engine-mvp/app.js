@@ -905,7 +905,7 @@ async function compressVideoForDirectAnalysis(file) {
       const blob = await recordCompressedVideo(file, attempt);
       if (blob.size <= 2.2 * 1024 * 1024) {
         setVideoAnalysisProgress("壓縮完成", 58, `影片已${attempt.label}成 ${Math.round(blob.size / 1024 / 1024 * 10) / 10}MB，準備送出分析。`);
-        return fileToDataUrl(new File([blob], "compressed-video.webm", { type: blob.type || "video/webm" }));
+        return fileToDataUrl(new File([blob], "compressed-video.webm", { type: "video/webm" }));
       }
       lastError = new Error(`壓縮後仍有 ${Math.round(blob.size / 1024 / 1024 * 10) / 10}MB。`);
     } catch (error) {
@@ -969,7 +969,7 @@ function recordCompressedVideo(file, options) {
         recorder.onerror = () => reject(new Error("影片壓縮錄製失敗。"));
         recorder.onstop = () => {
           cleanup();
-          resolve(new Blob(chunks, { type: mimeType }));
+          resolve(new Blob(chunks, { type: "video/webm" }));
         };
 
         function drawFrame() {

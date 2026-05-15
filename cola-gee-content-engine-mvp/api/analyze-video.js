@@ -135,10 +135,11 @@ function extractOutputText(data) {
 }
 
 function parseDataUrl(dataUrl) {
-  const matched = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
+  const matched = String(dataUrl).match(/^data:([^,]+);base64,(.+)$/);
   if (!matched) return null;
+  const mimeType = matched[1].split(";")[0] || "video/webm";
   return {
-    mimeType: matched[1],
+    mimeType,
     buffer: Buffer.from(matched[2], "base64")
   };
 }
