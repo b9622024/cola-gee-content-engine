@@ -507,39 +507,30 @@ function renderResearch() {
     <div class="panel">
       <div class="split-title">
         <h3>競品影片分析器</h3>
-        <span class="tag">連結或影片檔都可用</span>
+        <span class="tag">貼連結或上傳影片</span>
       </div>
       <div class="notice" style="margin-bottom:12px">
-        直接貼 IG / TikTok / Shorts 連結最方便；若平台無法被系統讀取，請補上 Hook、逐字稿或畫面描述，分析會更準。上傳影片目前可保存影片資訊與預覽，但仍建議補逐字稿或重點。
+        介面已簡化成兩種方式：貼影片連結，或上傳影片檔。IG / TikTok 連結若平台限制讀取，請改用上傳影片檔，成功率最高。
       </div>
-      <div class="form">
-        ${selectField("compInputType", "素材來源", ["貼連結", "上傳影片"], "貼連結", "span-3")}
-        ${inputField("compUrl", "影片連結", "url", "https://www.instagram.com/reel/...", "span-5")}
-        <div class="field span-4">
-          <label for="compVideoFile">上傳影片檔</label>
-          <input id="compVideoFile" type="file" accept="video/*" onchange="handleCompetitorVideoUpload(this)">
+      <div class="grid two">
+        <div class="item">
+          <strong>貼連結分析</strong>
+          <div class="field">
+            <label for="compUrl">影片連結</label>
+            <input id="compUrl" type="url" placeholder="貼上 Instagram / TikTok / Shorts / MP4 連結">
+          </div>
+          <div class="actions" style="margin-top:10px">
+            <button class="btn" onclick="analyzeCompetitorLink()">分析連結</button>
+          </div>
         </div>
-        ${inputField("compPlatform", "平台", "text", "Instagram Reels", "span-3")}
-        ${inputField("compAccountType", "帳號類型", "text", "減重教練 / 健康教育", "span-3")}
-        ${selectField("compTargetTopic", "改寫主題", state.settings.topics, "壓力與減脂", "span-3")}
-        ${selectField("compTargetAudience", "改寫受眾", state.settings.audiences, "壓力大會亂吃的人", "span-3")}
-        ${inputField("compViews", "觀看數", "number", 0, "span-2")}
-        ${inputField("compComments", "留言數", "number", 0, "span-2")}
-        ${inputField("compShares", "分享數", "number", 0, "span-2")}
-        ${inputField("compSaves", "收藏數", "number", 0, "span-2")}
-        ${inputField("compLength", "影片長度", "text", "60 秒", "span-2")}
-        ${selectField("compCta", "改寫 CTA", state.settings.ctas, "留言「測驗」", "span-2")}
-        ${inputField("compHook", "原影片開頭 Hook", "text", "白天忍住，晚上卻爆吃？", "span-6")}
-        ${inputField("compCommentsTheme", "留言區常見反應", "text", "我也是、晚上最難控制、想知道怎麼改善", "span-6")}
-        ${textareaField("compTranscript", "影片逐字稿或大概內容", "貼上逐字稿，或用條列寫出影片講了什麼。", "span-6")}
-        ${textareaField("compScenes", "畫面分鏡描述", "例如：開頭自拍口播、切外送畫面、字幕列三個原因、最後 CTA。", "span-6")}
-        ${textareaField("compWhy", "你覺得它紅的原因", "例如：痛點很準、留言門檻低、Hook 很像我的日常。", "span-12")}
-        <div class="field span-12">
-          <div class="actions">
-            <button class="btn secondary" onclick="checkVideoAiApi()">檢查 AI 連線</button>
+        <div class="item">
+          <strong>上傳檔案分析</strong>
+          <div class="field">
+            <label for="compVideoFile">影片檔</label>
+            <input id="compVideoFile" type="file" accept="video/*" onchange="handleCompetitorVideoUpload(this)">
+          </div>
+          <div class="actions" style="margin-top:10px">
             <button class="btn warn" onclick="autoAnalyzeUploadedVideo()">自動分析上傳影片</button>
-            <button class="btn" onclick="analyzeCompetitorVideo()">分析並改寫</button>
-            <button class="btn secondary" onclick="copyCurrentCompetitorAnalysis()">複製分析結果</button>
           </div>
         </div>
       </div>
@@ -548,7 +539,7 @@ function renderResearch() {
     <div class="panel" style="margin-top:16px">
       <div class="copy-row">
         <h3 style="margin:0">分析結果</h3>
-        <span class="muted small">會同時儲存到下方分析紀錄</span>
+        <button class="btn secondary" onclick="copyCurrentCompetitorAnalysis()">複製分析結果</button>
       </div>
       <div id="videoAnalysisProgress" class="analysis-progress hidden">
         <div class="progress-top">
@@ -558,7 +549,7 @@ function renderResearch() {
         <div class="progress-bar"><span id="videoAnalysisBar" style="width:0%"></span></div>
         <div id="videoAnalysisDetail" class="muted small">結果會顯示在下方。</div>
       </div>
-      <pre id="competitorAnalysisOutput" class="output">${escapeHtml(state.competitor_analyses[0] ? formatCompetitorAnalysis(state.competitor_analyses[0]) : "貼上競品影片資訊後，按「分析並改寫」。")}</pre>
+      <pre id="competitorAnalysisOutput" class="output">${escapeHtml(state.competitor_analyses[0] ? formatCompetitorAnalysis(state.competitor_analyses[0]) : "貼連結或上傳影片後，按分析。")}</pre>
     </div>
     <div class="grid two" style="margin-top:16px">
       <div class="panel">
@@ -692,6 +683,112 @@ function stopVideoAnalysisTimer() {
   videoAnalysisTimer = null;
 }
 
+function competitorDefaults() {
+  return {
+    platform: detectPlatformFromUrl(val("compUrl")),
+    account_type: "減重教練 / 健康教育",
+    topic: "壓力與減脂",
+    audience: "30 歲以上、常外食、沒時間運動、容易復胖的上班族",
+    cta: "留言「測驗」",
+    hook: ""
+  };
+}
+
+function detectPlatformFromUrl(url) {
+  const value = String(url || "").toLowerCase();
+  if (value.includes("instagram.com")) return "Instagram Reels";
+  if (value.includes("tiktok.com")) return "TikTok";
+  if (value.includes("youtube.com") || value.includes("youtu.be")) return "YouTube Shorts";
+  if (value.includes("facebook.com")) return "Facebook";
+  return "影片連結";
+}
+
+async function analyzeCompetitorLink() {
+  const url = val("compUrl").trim();
+  const output = document.getElementById("competitorAnalysisOutput");
+  const analyzeButton = Array.from(document.querySelectorAll("button")).find((button) => button.textContent.includes("分析連結"));
+  if (!url) {
+    if (output) output.textContent = "請先貼上影片連結，再按「分析連結」。";
+    return;
+  }
+  if (!url.startsWith("https://")) {
+    if (output) output.textContent = "請貼上 https:// 開頭的影片連結。";
+    return;
+  }
+
+  const defaults = competitorDefaults();
+  if (analyzeButton) analyzeButton.disabled = true;
+  if (output) output.textContent = "正在嘗試讀取影片連結並交給 AI 分析，請稍候...";
+  try {
+    setVideoAnalysisProgress("讀取影片連結", 12, "正在嘗試從連結讀取影片。");
+    startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在讀取連結、轉逐字稿與分析內容");
+    const response = await fetch("/api/analyze-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_name: "linked-video.mp4",
+        video_url: url,
+        video_data_url: "",
+        audio_data_url: "",
+        audio_file_name: "",
+        frames: [],
+        source_url: url,
+        platform: defaults.platform,
+        account_type: defaults.account_type,
+        topic: defaults.topic,
+        audience: defaults.audience,
+        cta: defaults.cta,
+        hook: defaults.hook
+      })
+    });
+    const rawText = await response.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) {
+      const detail = data.error || rawText.slice(0, 240) || "沒有回傳錯誤內容";
+      throw new Error(`HTTP ${response.status}：${detail}`);
+    }
+    stopVideoAnalysisTimer();
+    setVideoAnalysisProgress("分析完成", 100, "連結分析已完成，結果會顯示在下方並儲存到分析紀錄。");
+    const markdown = data.analysis || "AI 沒有回傳分析內容。";
+    if (output) output.textContent = markdown;
+    state.competitor_analyses.unshift({
+      id: uid("auto-link"),
+      created_at: iso(),
+      input_type: "影片連結自動分析",
+      url,
+      file_name: "",
+      platform: defaults.platform,
+      account_type: defaults.account_type,
+      topic: defaults.topic,
+      audience: defaults.audience,
+      views: 0,
+      comments: 0,
+      shares: 0,
+      saves: 0,
+      detected_formula: { name: "AI 自動分析", id: "auto-ai" },
+      viral_reason: ["已透過影片連結自動分析。"],
+      rewrite_hooks: ["請查看上方 AI 分析結果。"],
+      auto_analysis_markdown: markdown
+    });
+    save();
+  } catch (error) {
+    stopVideoAnalysisTimer();
+    const friendlyError = friendlyAnalysisError(error.message || "請查看下方錯誤原因。");
+    setVideoAnalysisProgress("分析失敗", 100, friendlyError);
+    if (output) output.textContent = `連結分析失敗：${friendlyError}
+
+如果你貼的是 Instagram、TikTok、Facebook 或 Shorts 連結，平台常會阻擋系統直接讀取影片。
+這種情況請改用右邊的「上傳檔案分析」，成功率會比較高。`;
+  } finally {
+    if (analyzeButton) analyzeButton.disabled = false;
+  }
+}
+
 async function checkVideoAiApi() {
   const output = document.getElementById("competitorAnalysisOutput");
   if (output) output.textContent = "正在檢查 AI 影片分析 API...";
@@ -746,6 +843,7 @@ async function autoAnalyzeUploadedVideo() {
   }
   const useLocalCompression = file.size > 4 * 1024 * 1024;
   const useBlobUpload = false;
+  const defaults = competitorDefaults();
   if (analyzeButton) analyzeButton.disabled = true;
   if (output) {
     output.textContent = useLocalCompression
@@ -784,12 +882,12 @@ async function autoAnalyzeUploadedVideo() {
         audio_file_name: useLocalCompression ? "extracted-audio.wav" : file.name,
         frames,
         source_url: val("compUrl"),
-        platform: val("compPlatform"),
-        account_type: val("compAccountType"),
-        topic: val("compTargetTopic"),
-        audience: val("compTargetAudience"),
-        cta: val("compCta"),
-        hook: val("compHook")
+        platform: defaults.platform,
+        account_type: defaults.account_type,
+        topic: defaults.topic,
+        audience: defaults.audience,
+        cta: defaults.cta,
+        hook: defaults.hook
       })
     });
     const rawText = await response.text();
@@ -816,14 +914,14 @@ async function autoAnalyzeUploadedVideo() {
       input_type: "上傳影片自動分析",
       url: val("compUrl"),
       file_name: file.name,
-      platform: val("compPlatform"),
-      account_type: val("compAccountType"),
-      topic: val("compTargetTopic"),
-      audience: val("compTargetAudience"),
-      views: numVal("compViews"),
-      comments: numVal("compComments"),
-      shares: numVal("compShares"),
-      saves: numVal("compSaves"),
+      platform: defaults.platform,
+      account_type: defaults.account_type,
+      topic: defaults.topic,
+      audience: defaults.audience,
+      views: 0,
+      comments: 0,
+      shares: 0,
+      saves: 0,
       detected_formula: { name: "AI 自動分析", id: "auto-ai" },
       viral_reason: ["已透過影片逐字稿與關鍵畫面自動分析。"],
       rewrite_hooks: ["請查看上方 AI 分析結果。"],
@@ -838,10 +936,10 @@ async function autoAnalyzeUploadedVideo() {
 
 你可以先檢查：
 1. Vercel 是否已上傳 api/analyze-video.js 並重新部署
-2. Vercel 是否有設定 OPENAI_API_KEY 和 BLOB_READ_WRITE_TOKEN，而且有重新部署
-3. 影片是否小於 20MB，格式建議 mp4、mov 或 webm
-4. OpenAI 帳號是否有可用額度或付款方式
-5. 如果只看到 404，代表 API 檔案沒有部署成功`;
+2. Vercel 是否有設定 OPENAI_API_KEY，而且有重新部署
+3. OpenAI 帳號是否有可用額度或付款方式
+4. 影片是否小於 20MB，格式建議 mp4、mov 或 webm
+5. 如果是貼 IG / TikTok / Facebook 連結失敗，請改用上傳影片檔`;
   } finally {
     if (analyzeButton) analyzeButton.disabled = false;
   }
@@ -1308,25 +1406,26 @@ function seekVideo(video, time) {
 }
 
 function analyzeCompetitorVideo() {
+  const defaults = competitorDefaults();
   const input = {
-    input_type: val("compInputType"),
+    input_type: "簡化介面分析",
     url: val("compUrl"),
     file_name: document.getElementById("compVideoFile")?.files?.[0]?.name || "",
-    platform: val("compPlatform"),
-    account_type: val("compAccountType"),
-    topic: val("compTargetTopic"),
-    audience: val("compTargetAudience"),
-    views: numVal("compViews"),
-    comments: numVal("compComments"),
-    shares: numVal("compShares"),
-    saves: numVal("compSaves"),
-    length: val("compLength"),
-    cta: val("compCta"),
-    hook: val("compHook"),
-    comments_theme: val("compCommentsTheme"),
-    transcript: val("compTranscript"),
-    scenes: val("compScenes"),
-    why: val("compWhy")
+    platform: defaults.platform,
+    account_type: defaults.account_type,
+    topic: defaults.topic,
+    audience: defaults.audience,
+    views: 0,
+    comments: 0,
+    shares: 0,
+    saves: 0,
+    length: "",
+    cta: defaults.cta,
+    hook: defaults.hook,
+    comments_theme: "",
+    transcript: "",
+    scenes: "",
+    why: ""
   };
   const analysis = buildCompetitorAnalysis(input);
   state.competitor_analyses.unshift(analysis);
