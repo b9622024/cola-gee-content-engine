@@ -829,7 +829,8 @@ async function autoAnalyzeUploadedVideo() {
     save();
   } catch (error) {
     stopVideoAnalysisTimer();
-    setVideoAnalysisProgress("分析失敗", 100, error.message || "請查看下方錯誤原因。");
+    const friendlyError = friendlyAnalysisError(error.message || "請查看下方錯誤原因。");
+    setVideoAnalysisProgress("分析失敗", 100, friendlyError);
     if (output) output.textContent = `自動分析失敗：${error.message}
 
 你可以先檢查：
@@ -841,6 +842,17 @@ async function autoAnalyzeUploadedVideo() {
   } finally {
     if (analyzeButton) analyzeButton.disabled = false;
   }
+}
+
+function friendlyAnalysisError(message) {
+  const lower = String(message || "").toLowerCase();
+  if (lower.includes("openai 額度不足") || lower.includes("exceeded your current quota") || lower.includes("insufficient_quota")) {
+    return "OpenAI 額度不足或付款設定尚未完成。請到 OpenAI Platform 的 Billing 檢查付款方式與可用額度。";
+  }
+  if (lower.includes("api key")) {
+    return "OpenAI API Key 可能無效或尚未在 Vercel 正確設定。";
+  }
+  return message;
 }
 
 async function uploadCompetitorVideoToBlob(file, onProgress) {

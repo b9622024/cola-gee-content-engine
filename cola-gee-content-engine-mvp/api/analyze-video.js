@@ -43,7 +43,8 @@ module.exports = async function handler(req, res) {
       analysis
     });
   } catch (error) {
-    return send(res, 500, { error: error.message || "影片分析失敗。" });
+    const normalized = normalizeOpenAiError(error);
+    return send(res, normalized.status, { error: normalized.message });
   }
 };
 
@@ -60,7 +61,7 @@ async function transcribeVideo(apiKey, video, fileName) {
     body: form
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error?.message || "逐字稿轉換失敗。");
+  if (!response.ok) throw createOpenAiError(response, data, "逐字稿轉換失敗。");
   return data.text || "";
 }
 
@@ -119,8 +120,42 @@ ${body.transcript || "無逐字稿"}
     })
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error?.message || "AI 分析失敗。");
+  if (!response.ok) throw createOpenAiError(response, data, "AI 分析失敗。");
   return extractOutputText(data);
+}
+
+function createOpenAiError(response, data, fallbackMessage) {
+  const error = new Error(data.error?.message || fallbackMessage);
+  error.status = response.status;
+  error.code = data.error?.code || data.error?.type || "";
+  return error;
+}
+
+function normalizeOpenAiError(error) {
+  const message = error.message || "影片分析失敗。";
+  const lower = message.toLowerCase();
+  if (lower.includes("exceeded your current quota") || lower.includes("insufficient_quota")) {
+    return {
+      status: 402,
+      message: "OpenAI 額度不足或尚未完成付款設定。請到 OpenAI Platform 的 Billing 檢查是否已綁定付款方式、是否有可用額度，完成後回 Vercel 重新部署再測試。"
+    };
+  }
+  if (error.status === 401) {
+    return {
+      status: 401,
+      message: "OpenAI API Key 無效或已失效。請重新建立 OPENAI_API_KEY，更新到 Vercel 後重新部署。"
+    };
+  }
+  if (error.status === 429) {
+    return {
+      status: 429,
+      message: "OpenAI 目前請求量或額度受限。請稍後再試，或檢查 OpenAI Platform 的 Usage 和 Billing。"
+    };
+  }
+  return {
+    status: error.status && error.status >= 400 ? error.status : 500,
+    message
+  };
 }
 
 function extractOutputText(data) {
