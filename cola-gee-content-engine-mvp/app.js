@@ -766,14 +766,12 @@ async function autoAnalyzeUploadedVideo() {
       ? `已抽取 ${frames.length} 張關鍵畫面。`
       : "未取得關鍵畫面，會先用影片逐字稿與你填寫的欄位分析。";
 
-    setVideoAnalysisProgress(useLocalCompression ? "本機壓縮影片" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
-    const videoPayload = useLocalCompression
-        ? await compressVideoForDirectAnalysis(file)
-      : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
+    setVideoAnalysisProgress(useLocalCompression ? "抽取音訊" : "讀取影片", 15, `${frameDetail} 接著處理音訊。`);
     const audioPayload = useLocalCompression
-      ? await readOriginalAudioForTranscription(file)
-      : videoPayload;
-    setVideoAnalysisProgress("影片已就緒", 62, useLocalCompression ? "影片已壓縮完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
+      ? await extractAudioWavForTranscription(file)
+      : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
+    const videoPayload = useLocalCompression ? "" : audioPayload;
+    setVideoAnalysisProgress("音訊已就緒", 62, useLocalCompression ? "已抽出小音訊檔，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
     startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
       method: "POST",
@@ -783,7 +781,7 @@ async function autoAnalyzeUploadedVideo() {
         video_data_url: useBlobUpload ? "" : videoPayload,
         video_url: useBlobUpload ? videoPayload : "",
         audio_data_url: audioPayload,
-        audio_file_name: file.name,
+        audio_file_name: useLocalCompression ? "extracted-audio.wav" : file.name,
         frames,
         source_url: val("compUrl"),
         platform: val("compPlatform"),
@@ -935,6 +933,66 @@ async function compressVideoForDirectAnalysis(file) {
 async function readOriginalAudioForTranscription(file) {
   setVideoAnalysisProgress("讀取原始音訊", 60, "正在保留原始影片音訊，避免壓縮音軌造成逐字稿失敗。");
   return withTimeout(fileToDataUrl(file), 60000, "原始影片讀取超過 60 秒，請確認檔案格式。");
+}
+
+async function extractAudioWavForTranscription(file) {
+  setVideoAnalysisProgress("抽取音訊", 30, "正在從影片抽出音訊並轉成小型 WAV。");
+  if (!window.AudioContext && !window.webkitAudioContext) {
+    throw new Error("這個瀏覽器不支援音訊抽取，請改用 Chrome 或先上傳 4MB 以下影片。");
+  }
+  const arrayBuffer = await withTimeout(file.arrayBuffer(), 60000, "影片讀取超過 60 秒，請確認檔案格式。");
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const audioContext = new AudioContextClass();
+  try {
+    const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    const targetRate = 16000;
+    const duration = decoded.duration;
+    const frameCount = Math.ceil(duration * targetRate);
+    const offlineContext = new OfflineAudioContext(1, frameCount, targetRate);
+    const source = offlineContext.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offlineContext.destination);
+    source.start(0);
+    setVideoAnalysisProgress("轉換音訊", 44, `正在轉成 16kHz 單聲道 WAV，影片長度約 ${Math.round(duration)} 秒。`);
+    const rendered = await offlineContext.startRendering();
+    const wavBlob = audioBufferToWavBlob(rendered);
+    setVideoAnalysisProgress("音訊完成", 58, `音訊已轉成 ${Math.round(wavBlob.size / 1024 / 1024 * 10) / 10}MB WAV。`);
+    return fileToDataUrl(new File([wavBlob], "extracted-audio.wav", { type: "audio/wav" }));
+  } finally {
+    audioContext.close?.();
+  }
+}
+
+function audioBufferToWavBlob(audioBuffer) {
+  const channelData = audioBuffer.getChannelData(0);
+  const buffer = new ArrayBuffer(44 + channelData.length * 2);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + channelData.length * 2, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, audioBuffer.sampleRate, true);
+  view.setUint32(28, audioBuffer.sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, channelData.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < channelData.length; i++) {
+    const sample = Math.max(-1, Math.min(1, channelData[i]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+function writeAscii(view, offset, text) {
+  for (let i = 0; i < text.length; i++) {
+    view.setUint8(offset + i, text.charCodeAt(i));
+  }
 }
 
 function recordCompressedVideo(file, options) {
