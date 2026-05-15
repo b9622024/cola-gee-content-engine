@@ -183,11 +183,14 @@ function parseDataUrl(dataUrl) {
 async function fetchVideoFromUrl(url) {
   const value = String(url || "");
   if (!value.startsWith("https://")) {
-    throw new Error("Blob 影片網址格式不正確。");
+    throw new Error("影片連結格式不正確，請使用 https:// 開頭的連結。");
   }
   const response = await fetch(value);
-  if (!response.ok) throw new Error(`Blob 影片讀取失敗：HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`影片連結讀取失敗：HTTP ${response.status}。如果這是 Instagram、TikTok、Facebook 或 Shorts 連結，請改用上傳影片檔。`);
   const contentType = response.headers.get("content-type") || "video/mp4";
+  if (contentType && !/video|audio|octet-stream/i.test(contentType)) {
+    throw new Error("這個連結不是可直接讀取的影片檔。IG、TikTok、Facebook 或 Shorts 連結通常會被平台阻擋，請改用上傳影片檔。");
+  }
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > 22 * 1024 * 1024) {
     throw new Error("影片檔目前建議小於 20MB，請先裁短或壓縮後再上傳。");

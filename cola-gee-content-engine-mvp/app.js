@@ -1618,7 +1618,8 @@ function renderScriptGenerator() {
     ${selectField("scriptFormula", "流量腳本公式", formulaOptions(), "day-in-life", "span-4")}
     ${selectField("scriptStyle", "風格 / 模板", state.settings.templates, "情境共鳴型", "span-4")}
     ${selectField("scriptCta", "CTA", state.settings.ctas, "留言「測驗」", "span-4")}
-    <div class="field span-4"><button class="btn" onclick="generateScript()">產生短影音腳本</button></div>
+    <div class="field span-2"><button class="btn secondary" onclick="generateScript()">快速產生</button></div>
+    <div class="field span-2"><button class="btn" onclick="generateDeepScript()">AI 深度產生</button></div>
   `);
 }
 
@@ -1640,6 +1641,126 @@ function generateScript() {
   });
   save();
   renderOutput(formatScript(script), "短影音腳本已產出");
+}
+
+async function generateDeepScript() {
+  const output = document.getElementById("generatorOutput");
+  const title = document.getElementById("resultTitle");
+  const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent.includes("AI 深度產生"));
+  const formula = findFormula(val("scriptFormula"), val("scriptStyle"));
+  const topic = val("scriptTopic");
+  const audience = val("scriptAudience");
+  const goal = val("scriptGoal");
+  const length = val("scriptLength");
+  const style = val("scriptStyle");
+  const cta = val("scriptCta");
+  const research = relatedResearch(topic, audience, formula);
+  const competitorNotes = state.competitor_analyses.slice(0, 3).map((item) => ({
+    platform: item.platform || "",
+    topic: item.topic || "",
+    source: item.url || item.file_name || "",
+    formula: item.detected_formula?.name || "AI 自動分析",
+    insight: item.auto_analysis_markdown ? item.auto_analysis_markdown.slice(0, 1200) : (item.viral_reason || []).join("；")
+  }));
+
+  if (button) button.disabled = true;
+  if (title) title.textContent = "AI 正在先分析策略，再產生腳本...";
+  if (output) {
+    output.textContent = `AI 深度產生中，請稍候...
+
+這次會依序做：
+1. 分析受眾痛點
+2. 判斷最適合的 Hook 與腳本公式
+3. 產生 3 個內容角度
+4. 選出最佳角度
+5. 產出完整腳本、字幕、分鏡與自我檢查`;
+  }
+
+  try {
+    const response = await fetch("/api/generate-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic,
+        audience,
+        goal,
+        length,
+        style,
+        cta,
+        formula,
+        market_research: research,
+        competitor_notes: competitorNotes,
+        brand: state.settings.brand
+      })
+    });
+    const rawText = await response.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) {
+      const detail = data.error || rawText.slice(0, 240) || "沒有回傳錯誤內容";
+      throw new Error(`HTTP ${response.status}：${detail}`);
+    }
+    const markdown = data.markdown || "AI 沒有回傳腳本內容。";
+    const script = {
+      id: uid("ai-script"),
+      content_id: uid("idea"),
+      topic,
+      audience,
+      content_goal: goal,
+      length,
+      style,
+      formula,
+      research,
+      cta,
+      hook_options: data.hook_options || [],
+      selected_hook: data.selected_hook || "",
+      spoken_script: markdown,
+      subtitle_script: [],
+      storyboard: [],
+      cover_titles: [],
+      image_prompts: [],
+      ig_caption: "",
+      comment_guides: [],
+      quality: [],
+      ai_markdown: markdown,
+      created_at: iso(),
+      updated_at: iso()
+    };
+    state.scripts.unshift(script);
+    state.content_ideas.unshift({
+      id: script.content_id,
+      title: `${topic} AI 深度腳本`,
+      topic,
+      audience,
+      content_goal: goal,
+      content_format: "短影音",
+      hook_type: formula?.name || "AI 深度產生",
+      cta,
+      status: "已產出",
+      created_at: iso(),
+      updated_at: iso()
+    });
+    save();
+    renderOutput(markdown, "AI 深度腳本已產出");
+  } catch (error) {
+    const friendlyError = friendlyAnalysisError(error.message || "AI 深度產生失敗。");
+    if (title) title.textContent = "AI 深度產生失敗";
+    if (output) {
+      output.textContent = `AI 深度產生失敗：${friendlyError}
+
+你可以先檢查：
+1. Vercel 是否已上傳 api/generate-script.js 並重新部署
+2. Vercel 是否有設定 OPENAI_API_KEY
+3. OpenAI 帳號是否有可用額度
+4. 如果只是想先產內容，可以先用「快速產生」`;
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 function formulaOptions() {
@@ -2082,6 +2203,7 @@ function renderOutput(text, title) {
 }
 
 function formatScript(s) {
+  if (s.ai_markdown) return s.ai_markdown;
   return `# 短影音腳本｜${s.topic}
 
 內容目標：${s.content_goal}
