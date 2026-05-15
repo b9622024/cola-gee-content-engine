@@ -744,7 +744,8 @@ async function autoAnalyzeUploadedVideo() {
     if (output) output.textContent = `目前影片約 ${sizeMb}MB，超過工具設定的 20MB 上限。\n\n建議先把影片壓縮到 20MB 以下，或裁成 30 到 60 秒內再上傳。`;
     return;
   }
-  const useBlobUpload = file.size > 4 * 1024 * 1024;
+  const useLocalCompression = file.size > 4 * 1024 * 1024 && file.size <= 15 * 1024 * 1024;
+  const useBlobUpload = file.size > 4 * 1024 * 1024 && !useLocalCompression;
   if (analyzeButton) analyzeButton.disabled = true;
   if (output) {
     output.textContent = useBlobUpload
@@ -765,7 +766,7 @@ async function autoAnalyzeUploadedVideo() {
       ? `已抽取 ${frames.length} 張關鍵畫面。`
       : "未取得關鍵畫面，會先用影片逐字稿與你填寫的欄位分析。";
 
-    setVideoAnalysisProgress(useBlobUpload ? "準備上傳 Blob" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
+    setVideoAnalysisProgress(useBlobUpload ? "準備上傳 Blob" : useLocalCompression ? "本機壓縮影片" : "讀取影片", 15, `${frameDetail} 接著處理影片檔。`);
     const videoPayload = useBlobUpload
       ? await withTimeout(
           uploadCompetitorVideoToBlob(file, (percentage) => {
@@ -775,8 +776,10 @@ async function autoAnalyzeUploadedVideo() {
           900000,
           "影片上傳超過 15 分鐘沒有完成。請確認網路穩定，或先改用較短、較小的影片測試。"
         )
+      : useLocalCompression
+        ? await compressVideoForDirectAnalysis(file)
       : await withTimeout(fileToDataUrl(file), 60000, "影片讀取超過 60 秒沒有完成，請確認檔案格式。");
-    setVideoAnalysisProgress("影片已就緒", 62, useBlobUpload ? "Blob 上傳完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
+    setVideoAnalysisProgress("影片已就緒", 62, useBlobUpload ? "Blob 上傳完成，準備交給 AI 轉逐字稿。" : useLocalCompression ? "影片已壓縮完成，準備交給 AI 轉逐字稿。" : "影片已讀取完成，準備交給 AI 轉逐字稿。");
     if (output && useBlobUpload) output.textContent = "影片已上傳，正在交給 AI 轉逐字稿與分析分鏡...";
     startVideoAnalysisTimer("AI 轉逐字稿與分析", 72, "OpenAI 正在轉逐字稿、分析分鏡與改寫腳本");
     const response = await fetch("/api/analyze-video", {
@@ -896,6 +899,131 @@ async function uploadCompetitorVideoToBlob(file, onProgress) {
   if (typeof onProgress === "function") onProgress(100);
   setVideoAnalysisProgress("Blob 上傳完成", 60, "影片已上傳完成，正在進入 AI 轉逐字稿與分析。");
   return typeof blob === "string" ? blob : blob.url;
+}
+
+async function compressVideoForDirectAnalysis(file) {
+  if (!("MediaRecorder" in window)) {
+    throw new Error("這個瀏覽器不支援本機影片壓縮，請改用 4MB 以下影片或更換 Chrome 瀏覽器。");
+  }
+  const attempts = [
+    { videoBitsPerSecond: 260000, audioBitsPerSecond: 32000, label: "標準壓縮" },
+    { videoBitsPerSecond: 160000, audioBitsPerSecond: 24000, label: "高壓縮" }
+  ];
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      const blob = await recordCompressedVideo(file, attempt);
+      if (blob.size <= 2.2 * 1024 * 1024) {
+        setVideoAnalysisProgress("壓縮完成", 58, `影片已${attempt.label}成 ${Math.round(blob.size / 1024 / 1024 * 10) / 10}MB，準備送出分析。`);
+        return fileToDataUrl(new File([blob], "compressed-video.webm", { type: blob.type || "video/webm" }));
+      }
+      lastError = new Error(`壓縮後仍有 ${Math.round(blob.size / 1024 / 1024 * 10) / 10}MB。`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`${lastError?.message || "影片壓縮失敗"} 請先把影片壓到 4MB 以下，或換一支較短影片測試。`);
+}
+
+function recordCompressedVideo(file, options) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const objectUrl = URL.createObjectURL(file);
+    const chunks = [];
+    let animationId = 0;
+    let recorder;
+    let timeout;
+
+    const cleanup = () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (timeout) clearTimeout(timeout);
+      URL.revokeObjectURL(objectUrl);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    video.preload = "auto";
+    video.muted = false;
+    video.playsInline = true;
+    video.src = objectUrl;
+
+    video.onloadedmetadata = async () => {
+      try {
+        const duration = Math.max(video.duration || 1, 1);
+        canvas.width = 360;
+        canvas.height = 640;
+        const canvasStream = canvas.captureStream ? canvas.captureStream(12) : null;
+        const sourceStream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null;
+        if (!canvasStream || !sourceStream) throw new Error("瀏覽器無法擷取影片串流。");
+        const tracks = [
+          ...canvasStream.getVideoTracks(),
+          ...sourceStream.getAudioTracks()
+        ];
+        if (!tracks.length) throw new Error("無法建立壓縮影片串流。");
+        const outputStream = new MediaStream(tracks);
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+          ? "video/webm;codecs=vp8,opus"
+          : "video/webm";
+        recorder = new MediaRecorder(outputStream, {
+          mimeType,
+          videoBitsPerSecond: options.videoBitsPerSecond,
+          audioBitsPerSecond: options.audioBitsPerSecond
+        });
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size) chunks.push(event.data);
+        };
+        recorder.onerror = () => reject(new Error("影片壓縮錄製失敗。"));
+        recorder.onstop = () => {
+          cleanup();
+          resolve(new Blob(chunks, { type: mimeType }));
+        };
+
+        function drawFrame() {
+          const videoRatio = video.videoWidth / video.videoHeight || 9 / 16;
+          const canvasRatio = canvas.width / canvas.height;
+          let drawWidth = canvas.width;
+          let drawHeight = canvas.height;
+          let dx = 0;
+          let dy = 0;
+          if (videoRatio > canvasRatio) {
+            drawHeight = canvas.height;
+            drawWidth = drawHeight * videoRatio;
+            dx = (canvas.width - drawWidth) / 2;
+          } else {
+            drawWidth = canvas.width;
+            drawHeight = drawWidth / videoRatio;
+            dy = (canvas.height - drawHeight) / 2;
+          }
+          ctx.fillStyle = "#111";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, dx, dy, drawWidth, drawHeight);
+          const progress = Math.min(55, 18 + (video.currentTime / duration) * 37);
+          setVideoAnalysisProgress("本機壓縮影片", progress, `正在壓縮影片，約需等待影片長度。已處理 ${Math.round(video.currentTime)} / ${Math.round(duration)} 秒。`);
+          animationId = requestAnimationFrame(drawFrame);
+        }
+
+        timeout = setTimeout(() => {
+          if (recorder && recorder.state !== "inactive") recorder.stop();
+        }, (duration + 8) * 1000);
+        recorder.start(1000);
+        await video.play();
+        drawFrame();
+        video.onended = () => {
+          if (recorder && recorder.state !== "inactive") recorder.stop();
+        };
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("影片讀取失敗，無法進行本機壓縮。"));
+    };
+  });
 }
 
 function buildVercelBlobUrl(clientToken, pathname) {
